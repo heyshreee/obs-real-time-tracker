@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000');
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('token');
