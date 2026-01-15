@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { Plus, ExternalLink, Calendar, BarChart2, Trash2 } from 'lucide-react';
+import { Plus, ExternalLink, Calendar, BarChart2, Trash2, Loader2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
@@ -26,13 +26,13 @@ export default function Projects() {
             // Fetch stats for all projects
             if (projectsData.length > 0) {
                 const statsPromises = projectsData.map(p =>
-                    apiRequest(`/projects/${p._id}/stats`).catch(() => null)
+                    apiRequest(`/projects/${p.id}/stats`).catch(() => null)
                 );
                 const allStats = await Promise.all(statsPromises);
 
                 const statsMap = {};
                 projectsData.forEach((p, i) => {
-                    statsMap[p._id] = allStats[i];
+                    statsMap[p.id] = allStats[i];
                 });
                 setStats(statsMap);
             }
@@ -43,8 +43,13 @@ export default function Projects() {
         }
     };
 
+    const [creating, setCreating] = useState(false);
+
     const handleCreateProject = async (e) => {
         e.preventDefault();
+        if (creating) return;
+
+        setCreating(true);
         try {
             await apiRequest('/projects', {
                 method: 'POST',
@@ -57,11 +62,17 @@ export default function Projects() {
             loadUser(); // Update limits in layout
         } catch (err) {
             showToast(err.message, 'error');
+        } finally {
+            setCreating(false);
         }
     };
 
+    const [deletingId, setDeletingId] = useState(null);
+
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this project?')) return;
+
+        setDeletingId(id);
         try {
             await apiRequest(`/projects/${id}`, { method: 'DELETE' });
             showToast('Project deleted', 'success');
@@ -69,10 +80,16 @@ export default function Projects() {
             loadUser();
         } catch (err) {
             showToast(err.message, 'error');
+        } finally {
+            setDeletingId(null);
         }
     };
 
-    if (loading) return <div className="text-slate-400">Loading projects...</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+        </div>
+    );
 
     const projectLimit = user?.limits?.projectLimit || 10;
     const projectsUsed = projects.length;
@@ -138,17 +155,25 @@ export default function Projects() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map((project) => (
-                        <div key={project._id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 hover:border-blue-500/50 transition-colors group">
+                        <div key={project.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 hover:border-blue-500/50 transition-colors group">
                             <div className="flex justify-between items-start mb-4">
-                                <Link to={`/projects/${project._id}`} className="text-lg font-semibold text-white hover:text-blue-400 transition-colors">
+                                <Link to={`/projects/${project.id}`} className="text-lg font-semibold text-white hover:text-blue-400 transition-colors">
                                     {project.name}
                                 </Link>
                                 <div className="flex gap-2">
-                                    <Link to={`/projects/${project._id}`} className="text-slate-500 hover:text-blue-400 transition-colors">
+                                    <Link to={`/projects/${project.id}`} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <ExternalLink className="h-4 w-4" />
                                     </Link>
-                                    <button onClick={() => handleDelete(project._id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                                        <Trash2 className="h-4 w-4" />
+                                    <button
+                                        onClick={() => handleDelete(project.id)}
+                                        disabled={deletingId === project.id}
+                                        className="text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                                    >
+                                        {deletingId === project.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                        )}
                                     </button>
                                 </div>
                             </div>
@@ -156,7 +181,7 @@ export default function Projects() {
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-slate-400">Total Views</span>
-                                    <span className="text-white font-mono">{stats[project._id]?.total_views?.toLocaleString() || 0}</span>
+                                    <span className="text-white font-mono">{stats[project.id]?.total_views?.toLocaleString() || 0}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-slate-400">Tracking ID</span>
@@ -164,7 +189,7 @@ export default function Projects() {
                                 </div>
 
                                 <Link
-                                    to={`/projects/${project._id}`}
+                                    to={`/projects/${project.id}`}
                                     className="block w-full text-center py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-sm transition-colors"
                                 >
                                     View Details
@@ -210,9 +235,11 @@ export default function Projects() {
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+                            disabled={creating}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Create
+                            {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {creating ? 'Creating...' : 'Create'}
                         </button>
                     </div>
                 </form>

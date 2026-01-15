@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Layers, Zap, ArrowRight } from 'lucide-react';
+import { Plus, Layers, Zap, ArrowRight, Loader2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
@@ -26,7 +26,7 @@ export default function Dashboard() {
 
       if (projectsData.length > 0) {
         const statsPromises = projectsData.map(p =>
-          apiRequest(`/projects/${p._id}/stats`).catch(() => null)
+          apiRequest(`/projects/${p.id}/stats`).catch(() => null)
         );
         const allStats = await Promise.all(statsPromises);
 
@@ -49,8 +49,13 @@ export default function Dashboard() {
     }
   };
 
+  const [creating, setCreating] = useState(false);
+
   const handleCreateProject = async (e) => {
     e.preventDefault();
+    if (creating) return;
+
+    setCreating(true);
     try {
       await apiRequest('/projects', {
         method: 'POST',
@@ -63,10 +68,17 @@ export default function Dashboard() {
       loadUser();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      setCreating(false);
     }
   };
 
-  if (loading) return <div className="text-slate-400">Loading dashboard...</div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+    </div>
+  );
+  if (!user) return null; // Should be handled by Layout redirect
 
   const projectLimit = user?.limits?.projectLimit || 10;
   const projectsUsed = projects.length;
@@ -144,7 +156,7 @@ export default function Dashboard() {
               <h3 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider">Top Projects</h3>
               <div className="space-y-3">
                 {stats.slice(0, 3).map((project) => (
-                  <div key={project._id} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-800">
+                  <div key={project.id} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-800">
                     <span className="text-white font-medium">{project.name}</span>
                     <span className="text-slate-400 text-sm">{project.views.toLocaleString()} views</span>
                   </div>
@@ -204,9 +216,11 @@ export default function Dashboard() {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+              disabled={creating}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create
+              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+              {creating ? 'Creating...' : 'Create'}
             </button>
           </div>
         </form>

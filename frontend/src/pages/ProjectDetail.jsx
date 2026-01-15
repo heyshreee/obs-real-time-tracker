@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom';
-import { ArrowLeft, Eye, Calendar, ExternalLink, Code } from 'lucide-react';
+import { ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import { useToast } from '../context/ToastContext';
@@ -65,7 +65,11 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) return <div className="text-slate-400">Loading project...</div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+    </div>
+  );
   if (!project) return <div className="text-red-400">Project not found</div>;
 
   const trackingUrl = `${API_URL}/track/${project.tracking_id}`;
@@ -103,8 +107,9 @@ fetch("${trackingUrl}", {
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
           >
+            {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
             {deleting ? 'Deleting...' : 'Delete Project'}
           </button>
         </div>

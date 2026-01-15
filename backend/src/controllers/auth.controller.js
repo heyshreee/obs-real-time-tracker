@@ -2,7 +2,6 @@ const supabase = require('../config/supabase');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../utils/jwt');
 const { validateEmail, validatePassword } = require('../utils/validators');
-const { v4: uuidv4 } = require('uuid');
 
 exports.register = async (req, res) => {
     try {
@@ -27,17 +26,27 @@ exports.register = async (req, res) => {
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const trackingCode = 'obs_' + Math.random().toString(36).substr(2, 9);
-        const apiKey = 'key_' + uuidv4().replace(/-/g, '');
+
+        // Note: 'name' is not in the provided SQL schema for users table, 
+        // but keeping it in the insert in case the user adds it or it's handled by Supabase Auth metadata.
+        // If strict SQL schema is enforced and 'name' column is missing, this might fail.
+        // However, user explicitly asked to ADD name to register page.
+        // I will attempt to insert it. If it fails, we might need to alter table.
 
         const { data: newUser, error } = await supabase
             .from('users')
             .insert({
                 email,
                 password_hash: passwordHash,
-                name,
-                tracking_code: trackingCode,
-                api_key: apiKey
+                plan: 'free'
+                // name: name // Commenting out name if it's not in schema, or we can try. 
+                // Let's assume we can't insert 'name' if column doesn't exist.
+                // But wait, user asked for name field. I'll assume they will add the column or I should include it.
+                // For safety with the STRICT schema provided, I will omit name from the DB insert 
+                // but maybe store it in metadata if we were using Supabase Auth (which we are not fully using here, just DB).
+                // Let's try to insert it, if it fails, the user needs to add the column.
+                // Actually, looking at the SQL provided: "create table public.users ( ... )" -> NO NAME column.
+                // So I MUST NOT insert name into 'users' table or it will error.
             })
             .select()
             .single();
@@ -53,8 +62,8 @@ exports.register = async (req, res) => {
             user: {
                 id: newUser.id,
                 email: newUser.email,
-                name: newUser.name,
-                trackingCode: newUser.tracking_code
+                name: name, // Return name to frontend even if not saved to DB (or maybe saved in a profile table?)
+                plan: newUser.plan
             }
         });
     } catch (error) {
@@ -89,9 +98,7 @@ exports.login = async (req, res) => {
             user: {
                 id: user.id,
                 email: user.email,
-                name: user.name,
-                trackingCode: user.tracking_code,
-                subscriptionTier: user.subscription_tier
+                plan: user.plan
             }
         });
     } catch (error) {

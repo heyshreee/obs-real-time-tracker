@@ -15,8 +15,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
-    credentials: true
+    origin: '*',
+    methods: ['GET', 'POST']
   }
 });
 
@@ -25,7 +25,7 @@ global.io = io;
 
 app.use(helmet());
 app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
@@ -33,6 +33,8 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/visitors', visitorRoutes);
+app.use('/api/projects', require('./routes/project.routes'));
+app.use('/api/track', require('./routes/track.routes'));
 // app.use('/api/analytics', analyticsRoutes);
 // app.use('/api/payments', paymentRoutes);
 

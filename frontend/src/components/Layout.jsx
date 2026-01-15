@@ -22,10 +22,12 @@ export default function Layout() {
             const userData = await apiRequest('/auth/me');
             setUser(userData);
         } catch (err) {
-            // If auth fails, we might be on a public route or need login
-            // But Layout is usually for protected routes. 
-            // We'll let the pages handle redirect if needed, or handle it here.
-            // For now, just stop loading.
+            // Silent redirect on auth error
+            removeToken();
+            navigate('/login');
+            if (err.message !== 'Authentication required') {
+                showToast('Session expired. Please login again.', 'error');
+            }
         } finally {
             setLoading(false);
         }
@@ -83,8 +85,8 @@ export default function Layout() {
                                 to={item.path}
                                 onClick={() => setSidebarOpen(false)}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
                                 <Icon className="h-5 w-5" />

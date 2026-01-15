@@ -13,7 +13,7 @@ module.exports = async (req, res, next) => {
 
         const { data: user } = await supabase
             .from('users')
-            .select('id, email, subscription_tier')
+            .select('id, email, plan')
             .eq('id', decoded.id)
             .single();
 
