@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Loader2, Moon } from 'lucide-react';
+import { Mail, Lock, Loader2, Moon, User } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { setToken } from '../utils/auth';
 import { useToast } from '../context/ToastContext';
 
 export default function Register() {
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export default function Register() {
         try {
             await apiRequest('/auth/register', {
                 method: 'POST',
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ name, email, password }),
             });
             // Auto-login after registration
             const loginData = await apiRequest('/auth/login', {
@@ -79,6 +80,20 @@ export default function Register() {
 
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            className="w-full bg-slate-950/50 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                            placeholder="John Doe"
+                                        />
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
                                     <div className="relative">
