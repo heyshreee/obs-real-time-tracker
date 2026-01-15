@@ -1,0 +1,31 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon ./src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "geoip-lite": "^1.4.10",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "razorpay": "^2.9.6",
+    "resend": "^6.7.0",
+    "socket.io": "^4.8.3",
+    "ua-parser-js": "^2.0.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
