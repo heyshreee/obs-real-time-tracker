@@ -3,6 +3,7 @@ import { useOutletContext, Link } from 'react-router-dom';
 import { Plus, ExternalLink, Calendar, BarChart2, Trash2, Loader2 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
+import Spinner from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
 
 export default function Projects() {
@@ -98,6 +99,11 @@ export default function Projects() {
 
     return (
         <div>
+            {(deletingId || creating) && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+                    <Spinner fullScreen={false} />
+                </div>
+            )}
             {isLimitReached && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-8 flex items-center justify-between">
                     <div className="flex items-center gap-3">
