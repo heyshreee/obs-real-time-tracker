@@ -10,6 +10,17 @@ exports.createProject = async (req, res) => {
             return res.status(400).json({ error: 'Project name is required' });
         }
 
+        // Check if project with same name exists
+        const { data: existingProjects } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('name', name);
+
+        if (existingProjects && existingProjects.length > 0) {
+            return res.status(400).json({ error: 'Project with this name already exists' });
+        }
+
         const trackingId = 'trk_' + uuidv4().replace(/-/g, '').substring(0, 12);
 
         const { data: project, error } = await supabase
