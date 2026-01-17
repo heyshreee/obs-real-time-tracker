@@ -18,6 +18,7 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://heyshree.site',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     methods: ['GET', 'POST'],
@@ -39,6 +40,7 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://heyshree.site',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
@@ -57,8 +59,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/projects', require('./routes/project.routes'));
 app.use('/api/track', require('./routes/track.routes'));
-// app.use('/api/analytics', analyticsRoutes);
-// app.use('/api/payments', paymentRoutes);
+app.use('/api/users', require('./routes/user.routes'));
 
 // Socket.io setup
 setupVisitorSocket(io);
