@@ -2,9 +2,26 @@ const supabase = require('../config/supabase');
 const geoip = require('geoip-lite');
 const UAParser = require('ua-parser-js');
 
+// Simple in-memory cache for deduplication
+const requestCache = new Set();
+
 exports.trackVisitor = async (req, res) => {
     try {
         const { trackingCode, sessionId, pageUrl, referrer } = req.body;
+
+        // Deduplication check
+        // Use a combination of trackingCode, sessionId (if available), and pageUrl
+        // If sessionId is missing, we might rely on IP, but let's assume client sends something or we generate it later.
+        // Ideally, we generate sessionId first if missing, but for dedupe we need it now.
+        // If sessionId is missing, we can't effectively dedupe without IP.
+        const ip = req.ip || req.connection.remoteAddress;
+        const dedupeKey = `${trackingCode}-${sessionId || ip}-${pageUrl}`;
+
+        if (requestCache.has(dedupeKey)) {
+            return res.json({ success: true, ignored: true });
+        }
+        requestCache.add(dedupeKey);
+        setTimeout(() => requestCache.delete(dedupeKey), 2000); // 2 seconds debounce
 
         // 1. Get project by tracking ID (was trackingCode)
         const { data: project } = await supabase
@@ -17,18 +34,22 @@ exports.trackVisitor = async (req, res) => {
             return res.status(404).json({ error: 'Invalid tracking code' });
         }
 
-        const ip = req.ip || req.connection.remoteAddress;
         const geo = geoip.lookup(ip);
         const parser = new UAParser(req.headers['user-agent']);
         const uaResult = parser.getResult();
 
-        // 2. Update Counters (All-time views)
-        // We use RPC or direct increment if Supabase supports it, but for now simple update
-        // Note: Concurrency might be an issue here without atomic increment, 
-        // but assuming low traffic or eventually consistent for MVP.
-        // Better: create a stored procedure `increment_counter(project_id)`
+        let country = 'Unknown';
+        let city = 'Unknown';
 
-        // Using a hypothetical RPC call for atomicity if available, else fetch-update
+        if (geo) {
+            country = geo.country || 'Unknown';
+            city = geo.city || 'Unknown';
+        } else if (ip === '::1' || ip === '127.0.0.1' || ip.includes('127.0.0.1')) {
+            country = 'Localhost';
+            city = 'Local Machine';
+        }
+
+        // 2. Update Counters (All-time views)
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
             p_id: project.id
         });
@@ -51,11 +72,6 @@ exports.trackVisitor = async (req, res) => {
 
         // 3. Update Usages (Monthly views)
         const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-
-        // Try to insert new usage record, on conflict do nothing (we'll update next)
-        // Or better: Upsert with count increment? 
-        // Supabase doesn't support atomic increment on upsert easily without RPC.
-        // Let's try to find existing usage first.
         const { data: usage } = await supabase
             .from('usages')
             .select('views')
@@ -79,17 +95,14 @@ exports.trackVisitor = async (req, res) => {
                 });
         }
 
-        // 4. Keep detailed visitor log (Optional but good for "Real-time")
-        // Assuming 'visitors' table still exists or we want to keep this logic
-        // We link it to user_id (owner) and maybe project_id if we added it to visitors table
+        // 4. Keep detailed visitor log
         const visitorData = {
-            user_id: project.user_id, // Keep linking to user for now
-            // project_id: project.id, // Add this if visitors table has project_id
+            user_id: project.user_id,
             session_id: sessionId,
             ip_address: ip,
             user_agent: req.headers['user-agent'],
-            country: geo?.country || 'Unknown',
-            city: geo?.city || 'Unknown',
+            country: country,
+            city: city,
             device_type: uaResult.device.type || 'desktop',
             browser: uaResult.browser.name,
             os: uaResult.os.name,
@@ -147,54 +160,147 @@ exports.getLiveVisitors = async (req, res) => {
     }
 };
 
-exports.getStats = async (req, res) => {
+exports.getDashboardStats = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Aggregate stats from projects
-        const { data: projects } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('user_id', userId);
-
-        if (!projects || projects.length === 0) {
-            return res.json({ totalVisitors: 0, activeVisitors: 0 });
-        }
-
-        const projectIds = projects.map(p => p.id);
-
-        // Get total counts from counters
-        const { data: counters } = await supabase
-            .from('counters')
-            .select('count')
-            .in('project_id', projectIds);
-
-        const totalVisitors = counters?.reduce((sum, c) => sum + (c.count || 0), 0) || 0;
-
-        // Active visitors still from visitors table
-        const { count: activeVisitors } = await supabase
+        // 1. Real-time Visitors (Last 5 mins)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { count: realTimeVisitors } = await supabase
             .from('visitors')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .gte('last_seen', fiveMinutesAgo);
+
+        // 2. Traffic Trends (Last 7 days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+        const { data: dailyViews } = await supabase
+            .from('page_views')
+            .select('created_at')
+            .eq('user_id', userId)
+            .gte('created_at', sevenDaysAgoStr);
+
+        // Aggregate daily views
+        const trafficMap = {};
+        // Initialize last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            trafficMap[dateStr] = 0;
+        }
+
+        dailyViews?.forEach(v => {
+            const dateStr = v.created_at.split('T')[0];
+            if (trafficMap[dateStr] !== undefined) {
+                trafficMap[dateStr]++;
+            }
+        });
+
+        const trafficData = Object.keys(trafficMap).map(key => ({
+            name: new Date(key).toLocaleDateString('en-US', { weekday: 'short' }),
+            views: trafficMap[key]
+        }));
+
+        // 3. Top Referral Sources
+        const { data: sources } = await supabase
+            .from('visitors')
+            .select('referrer')
+            .eq('user_id', userId);
+
+        const sourceMap = {};
+        sources?.forEach(s => {
+            const ref = s.referrer ? new URL(s.referrer).hostname : 'Direct';
+            sourceMap[ref] = (sourceMap[ref] || 0) + 1;
+        });
+
+        const sourceData = Object.entries(sourceMap)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5)
+            .map((s, i) => ({ ...s, color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i] || '#CBD5E1' }));
+
+        // 4. Live Activity (Last 5 events)
+        const { data: recentActivity } = await supabase
+            .from('visitors')
+            .select('*')
+            .eq('user_id', userId)
+            .order('last_seen', { ascending: false })
+            .limit(5);
+
+        const liveActivity = recentActivity?.map(v => {
+            const locationStr = [v.city, v.country].filter(Boolean).join(', ') || 'Unknown Location';
+            return {
+                id: v.id,
+                type: 'view', // or session
+                action: `Visitor from ${locationStr}`,
+                target: v.page_url,
+                time: new Date(v.last_seen).toLocaleTimeString(),
+                location: v.ip_address
+            };
+        }) || [];
+
+        // 5. Sparkline (Visits per minute for last 30 mins)
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+        const { data: recentViews } = await supabase
+            .from('page_views')
+            .select('created_at')
+            .eq('user_id', userId)
+            .gte('created_at', thirtyMinutesAgo);
+
+        const sparklineMap = {};
+        // Initialize last 30 mins
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date();
+            d.setMinutes(d.getMinutes() - i);
+            const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            sparklineMap[timeStr] = 0;
+        }
+
+        recentViews?.forEach(v => {
+            const timeStr = new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (sparklineMap[timeStr] !== undefined) {
+                sparklineMap[timeStr]++;
+            }
+        });
+
+        const sparkline = Object.keys(sparklineMap).map(key => ({
+            name: key,
+            value: sparklineMap[key]
+        }));
 
         res.json({
-            totalVisitors,
-            activeVisitors
+            realTimeVisitors: realTimeVisitors || 0,
+            trafficData,
+            sourceData,
+            liveActivity,
+            sparkline
         });
+
     } catch (error) {
-        console.error('Get stats error:', error);
-        res.status(500).json({ error: 'Failed to fetch stats' });
+        console.error('Dashboard stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch dashboard stats' });
     }
 };
 
 exports.trackVisitorPublic = async (req, res) => {
     try {
         const { trackingId } = req.params;
-        // Merge params with body to reuse logic or just handle here
-        // We'll adapt the logic slightly
-
         const { sessionId, pageUrl, referrer } = req.body;
+
+        const ip = req.ip || req.connection.remoteAddress;
+
+        // Deduplication check
+        const dedupeKey = `${trackingId}-${sessionId || ip}-${pageUrl}`;
+        if (requestCache.has(dedupeKey)) {
+            return res.json({ success: true, ignored: true });
+        }
+        requestCache.add(dedupeKey);
+        setTimeout(() => requestCache.delete(dedupeKey), 2000); // 2 seconds debounce
 
         const { data: project } = await supabase
             .from('projects')
@@ -206,10 +312,20 @@ exports.trackVisitorPublic = async (req, res) => {
             return res.status(404).json({ error: 'Invalid tracking code' });
         }
 
-        const ip = req.ip || req.connection.remoteAddress;
         const geo = geoip.lookup(ip);
         const parser = new UAParser(req.headers['user-agent']);
         const uaResult = parser.getResult();
+
+        let country = 'Unknown';
+        let city = 'Unknown';
+
+        if (geo) {
+            country = geo.country || 'Unknown';
+            city = geo.city || 'Unknown';
+        } else if (ip === '::1' || ip === '127.0.0.1' || ip.includes('127.0.0.1')) {
+            country = 'Localhost';
+            city = 'Local Machine';
+        }
 
         // Update Counters
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
@@ -262,8 +378,8 @@ exports.trackVisitorPublic = async (req, res) => {
             session_id: sessionId || 'anon_' + Math.random().toString(36).substr(2, 9), // Fallback if no session
             ip_address: ip,
             user_agent: req.headers['user-agent'],
-            country: geo?.country || 'Unknown',
-            city: geo?.city || 'Unknown',
+            country: country,
+            city: city,
             device_type: uaResult.device.type || 'desktop',
             browser: uaResult.browser.name,
             os: uaResult.os.name,

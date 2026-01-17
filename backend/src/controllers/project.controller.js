@@ -111,13 +111,43 @@ exports.deleteProject = async (req, res) => {
 
 exports.getProjectStats = async (req, res) => {
     try {
-        // Mock stats for now as we don't have project-level tracking yet
-        // In a real implementation, we would query the visitors/page_views table filtered by project_id
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        // Verify project ownership
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Get total views from counters
+        const { data: counter } = await supabase
+            .from('counters')
+            .select('count')
+            .eq('project_id', id)
+            .single();
+
+        // Get current month views from usages
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const { data: usage } = await supabase
+            .from('usages')
+            .select('views')
+            .eq('project_id', id)
+            .eq('month', currentMonth)
+            .single();
+
         res.json({
-            total_views: 0,
-            current_month_views: 0
+            total_views: counter?.count || 0,
+            current_month_views: usage?.views || 0
         });
     } catch (error) {
+        console.error('Get project stats error:', error);
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 };

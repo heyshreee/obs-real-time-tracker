@@ -6,6 +6,7 @@ import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
+import { io } from 'socket.io-client';
 import {
   AreaChart,
   Area,
@@ -21,13 +22,6 @@ import {
   Pie
 } from 'recharts';
 
-
-const visitorBarData = [
-  { name: '1', value: 20 }, { name: '2', value: 40 }, { name: '3', value: 30 },
-  { name: '4', value: 60 }, { name: '5', value: 90 }, { name: '6', value: 50 },
-  { name: '7', value: 30 }, { name: '8', value: 40 },
-];
-
 export default function Dashboard() {
   const { user, loadUser } = useOutletContext();
   const [projects, setProjects] = useState([]);
@@ -42,17 +36,36 @@ export default function Dashboard() {
     realTimeVisitors: 0,
     trafficData: [],
     sourceData: [],
-    liveActivity: []
+    liveActivity: [],
+    sparkline: []
   });
 
   useEffect(() => {
     loadData();
-    // Optional: Poll for real-time updates every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
-  const loadData = async () => {
+    // Socket.io connection
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      socket.emit('join_room', token);
+    }
+
+    socket.on('visitor_update', () => {
+      loadData(false);
+    });
+
+    // Poll for real-time updates every 5 seconds as backup
+    const interval = setInterval(() => loadData(false), 5000);
+
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
+  }, [user?.id]);
+
+  const loadData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const [projectsData, statsData] = await Promise.all([
         apiRequest('/projects'),
@@ -82,9 +95,11 @@ export default function Dashboard() {
         setStats([]);
       }
     } catch (err) {
-      showToast(err.message, 'error');
+      // Only show toast on initial load error to avoid spamming
+      if (showLoading) showToast(err.message, 'error');
+      console.error(err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -120,7 +135,7 @@ export default function Dashboard() {
   const viewLimit = user?.limits?.monthlyLimit || 10000;
   const viewPercentage = Math.min((totalViewsUsed / viewLimit) * 100, 100);
 
-  const { realTimeVisitors, trafficData, sourceData, liveActivity } = dashboardStats;
+  const { realTimeVisitors, trafficData, sourceData, liveActivity, sparkline } = dashboardStats;
 
   const pieData = [
     { name: 'Used', value: totalViewsUsed, color: '#3B82F6' },
@@ -161,17 +176,17 @@ export default function Dashboard() {
           <div className="mt-8 z-10">
             <div className="flex items-end gap-3">
               <span className="text-5xl font-bold text-white">{realTimeVisitors.toLocaleString()}</span>
-              <span className="text-green-400 font-medium mb-2">~12%</span>
+              <span className="text-green-400 font-medium mb-2">Active</span>
             </div>
           </div>
 
           {/* Mini Bar Chart for visual effect */}
           <div className="h-16 mt-4 -mx-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={visitorBarData}>
+              <BarChart data={sparkline || []}>
                 <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                  {visitorBarData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 4 ? '#10B981' : '#1E293B'} />
+                  {(sparkline || []).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === (sparkline?.length - 1) ? '#10B981' : '#1E293B'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -363,8 +378,7 @@ export default function Dashboard() {
         </form>
       </Modal>
 
-      {/* Global Spinner for creation is handled in Projects.jsx, but we might want it here too if we use the same modal logic. 
-          Actually, the modal here is local. Let's add the spinner here too. */}
+      {/* Global Spinner for creation */}
       {creating && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
           <Spinner fullScreen={false} />

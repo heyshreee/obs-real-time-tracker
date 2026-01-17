@@ -9,6 +9,6 @@ router.post('/track', rateLimiter, visitorController.trackVisitor);
 
 // Protected endpoints
 router.get('/live', auth, visitorController.getLiveVisitors);
-router.get('/stats', auth, visitorController.getStats);
+router.get('/dashboard-stats', auth, visitorController.getDashboardStats);
 
 module.exports = router;
