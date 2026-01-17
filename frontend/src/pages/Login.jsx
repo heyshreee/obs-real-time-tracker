@@ -18,11 +18,11 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const data = await apiRequest('/auth/login', {
+            await apiRequest('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
             });
-            setToken(data.token);
+            // Token is set via HttpOnly cookie
             showToast('Welcome back!', 'success');
             navigate('/dashboard');
         } catch (err) {

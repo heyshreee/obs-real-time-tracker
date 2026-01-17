@@ -23,9 +23,26 @@ const io = new Server(server, {
 // Make io accessible globally
 global.io = io;
 
+const cookieParser = require('cookie-parser');
+
+// ...
+
 app.use(helmet());
+app.use(cookieParser());
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

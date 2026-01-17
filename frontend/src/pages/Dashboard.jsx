@@ -44,12 +44,12 @@ export default function Dashboard() {
     loadData();
 
     // Socket.io connection
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+    // Socket.io connection
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      withCredentials: true
+    });
 
-    const token = localStorage.getItem('token');
-    if (token) {
-      socket.emit('join_room', token);
-    }
+    // Connection is now authenticated via cookie automatically
 
     socket.on('visitor_update', () => {
       loadData(false);

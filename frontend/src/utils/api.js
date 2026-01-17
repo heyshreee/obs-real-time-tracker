@@ -1,7 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 export async function apiRequest(endpoint, options = {}) {
-  const token = localStorage.getItem('token');
+  // Token is now handled via HttpOnly cookie
   const headers = {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -10,13 +10,10 @@ export async function apiRequest(endpoint, options = {}) {
     ...options.headers,
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include', // Important for sending cookies
   });
 
   if (!response.ok) {

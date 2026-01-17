@@ -57,12 +57,18 @@ exports.register = async (req, res) => {
 
         const token = generateToken(newUser.id);
 
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         res.status(201).json({
-            token,
             user: {
                 id: newUser.id,
                 email: newUser.email,
-                name: name, // Return name to frontend even if not saved to DB (or maybe saved in a profile table?)
+                name: name,
                 plan: newUser.plan
             }
         });
@@ -93,8 +99,14 @@ exports.login = async (req, res) => {
 
         const token = generateToken(user.id);
 
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         res.json({
-            token,
             user: {
                 id: user.id,
                 email: user.email,
@@ -105,6 +117,11 @@ exports.login = async (req, res) => {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
     }
+};
+
+exports.logout = (req, res) => {
+    res.clearCookie('token');
+    res.json({ message: 'Logged out successfully' });
 };
 
 exports.getMe = async (req, res) => {

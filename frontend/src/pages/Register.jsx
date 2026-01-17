@@ -24,11 +24,11 @@ export default function Register() {
                 body: JSON.stringify({ name, email, password }),
             });
             // Auto-login after registration
-            const loginData = await apiRequest('/auth/login', {
+            await apiRequest('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
             });
-            setToken(loginData.token);
+            // Token is set via HttpOnly cookie
             showToast('Account created successfully!', 'success');
             navigate('/dashboard');
         } catch (err) {

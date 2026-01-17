@@ -23,18 +23,21 @@ export default function Layout() {
             setUser(userData);
         } catch (err) {
             // Silent redirect on auth error
-            removeToken();
             navigate('/login');
-            if (err.message !== 'Authentication required') {
-                showToast('Session expired. Please login again.', 'error');
+            if (err.message !== 'Authentication required' && err.message !== 'User not found') {
+                // Optional: showToast('Session expired. Please login again.', 'error');
             }
         } finally {
             setLoading(false);
         }
     };
 
-    const handleLogout = () => {
-        removeToken();
+    const handleLogout = async () => {
+        try {
+            await apiRequest('/auth/logout', { method: 'POST' });
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
         navigate('/login');
     };
 
