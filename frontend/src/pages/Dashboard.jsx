@@ -55,8 +55,8 @@ export default function Dashboard() {
       loadData(false);
     });
 
-    // Poll for real-time updates every 5 seconds as backup
-    const interval = setInterval(() => loadData(false), 5000);
+    // Poll for real-time updates every 1 second as backup
+    const interval = setInterval(() => loadData(false), 1000);
 
     return () => {
       clearInterval(interval);
