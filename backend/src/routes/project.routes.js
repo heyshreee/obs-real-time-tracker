@@ -10,5 +10,6 @@ router.get('/', projectController.getProjects);
 router.get('/:id', projectController.getProject);
 router.delete('/:id', projectController.deleteProject);
 router.get('/:id/stats', projectController.getProjectStats);
+router.put('/:id/pin', projectController.togglePin);
 
 module.exports = router;

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { Plus, ExternalLink, Calendar, BarChart2, Trash2, Loader2 } from 'lucide-react';
+import { Plus, ExternalLink, Calendar, BarChart2, Trash2, Loader2, Pin } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
 
 export default function Projects() {
-    const { user, loadUser } = useOutletContext();
+    const { user, loadUser, loadSidebarData } = useOutletContext();
     const [projects, setProjects] = useState([]);
     const [stats, setStats] = useState({});
     const [showModal, setShowModal] = useState(false);
@@ -79,10 +79,27 @@ export default function Projects() {
             showToast('Project deleted', 'success');
             loadProjects();
             loadUser();
+            loadSidebarData();
         } catch (err) {
             showToast(err.message, 'error');
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const handleTogglePin = async (project) => {
+        try {
+            const updatedProject = await apiRequest(`/projects/${project.id}/pin`, { method: 'PUT' });
+
+            // Update local state
+            setProjects(projects.map(p => p.id === project.id ? { ...p, is_pinned: updatedProject.is_pinned } : p));
+
+            // Update sidebar
+            loadSidebarData();
+
+            showToast(updatedProject.is_pinned ? 'Project pinned' : 'Project unpinned', 'success');
+        } catch (err) {
+            showToast(err.message, 'error');
         }
     };
 
@@ -161,12 +178,19 @@ export default function Projects() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map((project) => (
-                        <div key={project.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 hover:border-blue-500/50 transition-colors group">
+                        <div key={project.id} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 hover:border-blue-500/50 transition-colors group relative">
                             <div className="flex justify-between items-start mb-4">
                                 <Link to={`/projects/${project.id}`} className="text-lg font-semibold text-white hover:text-blue-400 transition-colors">
                                     {project.name}
                                 </Link>
                                 <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleTogglePin(project)}
+                                        className={`transition-colors ${project.is_pinned ? 'text-blue-400' : 'text-slate-500 hover:text-blue-400'}`}
+                                        title={project.is_pinned ? 'Unpin Project' : 'Pin Project'}
+                                    >
+                                        <Pin className={`h-4 w-4 ${project.is_pinned ? 'fill-current' : ''}`} />
+                                    </button>
                                     <Link to={`/projects/${project.id}`} className="text-slate-500 hover:text-blue-400 transition-colors">
                                         <ExternalLink className="h-4 w-4" />
                                     </Link>

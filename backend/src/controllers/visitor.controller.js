@@ -173,21 +173,21 @@ exports.getDashboardStats = async (req, res) => {
             .eq('is_active', true)
             .gte('last_seen', fiveMinutesAgo);
 
-        // 2. Traffic Trends (Last 7 days)
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+        // 2. Traffic Trends (Last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
 
         const { data: dailyViews } = await supabase
             .from('page_views')
             .select('created_at')
             .eq('user_id', userId)
-            .gte('created_at', sevenDaysAgoStr);
+            .gte('created_at', thirtyDaysAgoStr);
 
         // Aggregate daily views
         const trafficMap = {};
-        // Initialize last 7 days
-        for (let i = 6; i >= 0; i--) {
+        // Initialize last 30 days
+        for (let i = 29; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const dateStr = d.toISOString().split('T')[0];
@@ -202,7 +202,7 @@ exports.getDashboardStats = async (req, res) => {
         });
 
         const trafficData = Object.keys(trafficMap).map(key => ({
-            name: new Date(key).toLocaleDateString('en-US', { weekday: 'short' }),
+            name: new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             views: trafficMap[key]
         }));
 

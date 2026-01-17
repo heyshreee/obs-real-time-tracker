@@ -151,3 +151,37 @@ exports.getProjectStats = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 };
+
+exports.togglePin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        // First get current status
+        const { data: project, error: fetchError } = await supabase
+            .from('projects')
+            .select('is_pinned')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (fetchError || !project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const { data: updatedProject, error: updateError } = await supabase
+            .from('projects')
+            .update({ is_pinned: !project.is_pinned })
+            .eq('id', id)
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+        if (updateError) throw updateError;
+
+        res.json(updatedProject);
+    } catch (error) {
+        console.error('Toggle pin error:', error);
+        res.status(500).json({ error: 'Failed to toggle pin status' });
+    }
+};

@@ -38,15 +38,8 @@ exports.register = async (req, res) => {
             .insert({
                 email,
                 password_hash: passwordHash,
-                plan: 'free'
-                // name: name // Commenting out name if it's not in schema, or we can try. 
-                // Let's assume we can't insert 'name' if column doesn't exist.
-                // But wait, user asked for name field. I'll assume they will add the column or I should include it.
-                // For safety with the STRICT schema provided, I will omit name from the DB insert 
-                // but maybe store it in metadata if we were using Supabase Auth (which we are not fully using here, just DB).
-                // Let's try to insert it, if it fails, the user needs to add the column.
-                // Actually, looking at the SQL provided: "create table public.users ( ... )" -> NO NAME column.
-                // So I MUST NOT insert name into 'users' table or it will error.
+                plan: 'free',
+                name: name
             })
             .select()
             .single();
@@ -68,7 +61,7 @@ exports.register = async (req, res) => {
             user: {
                 id: newUser.id,
                 email: newUser.email,
-                name: name,
+                name: newUser.name,
                 plan: newUser.plan
             }
         });
@@ -110,6 +103,7 @@ exports.login = async (req, res) => {
             user: {
                 id: user.id,
                 email: user.email,
+                name: user.name,
                 plan: user.plan
             }
         });
