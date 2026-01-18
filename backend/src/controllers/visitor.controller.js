@@ -294,12 +294,54 @@ exports.getDashboardStats = async (req, res) => {
             value: sparklineMap[key]
         }));
 
+        // 6. Device Breakdown
+        const { data: devices } = await supabase
+            .from('visitors')
+            .select('device_type')
+            .eq('user_id', userId);
+
+        const deviceMap = {};
+        devices?.forEach(d => {
+            const type = d.device_type || 'desktop';
+            deviceMap[type] = (deviceMap[type] || 0) + 1;
+        });
+
+        const deviceStats = Object.keys(deviceMap).map(key => ({
+            name: key.charAt(0).toUpperCase() + key.slice(1),
+            value: deviceMap[key],
+            color: key === 'desktop' ? '#3B82F6' : key === 'mobile' ? '#10B981' : '#F59E0B'
+        }));
+
+        // 7. Top Pages
+        const { data: pages } = await supabase
+            .from('page_views')
+            .select('page_url')
+            .eq('user_id', userId);
+
+        const pageMap = {};
+        pages?.forEach(p => {
+            try {
+                const url = new URL(p.page_url);
+                const path = url.pathname;
+                pageMap[path] = (pageMap[path] || 0) + 1;
+            } catch (e) {
+                pageMap[p.page_url] = (pageMap[p.page_url] || 0) + 1;
+            }
+        });
+
+        const topPages = Object.entries(pageMap)
+            .map(([url, views]) => ({ url, views }))
+            .sort((a, b) => b.views - a.views)
+            .slice(0, 5);
+
         res.json({
             realTimeVisitors: realTimeVisitors || 0,
             trafficData,
             sourceData,
             liveActivity,
-            sparkline
+            sparkline,
+            deviceStats,
+            topPages
         });
 
     } catch (error) {
@@ -334,23 +376,7 @@ exports.trackVisitorPublic = async (req, res) => {
             return res.status(404).json({ error: 'Invalid tracking code' });
         }
 
-        // CORS Check
-        const origin = req.headers.origin;
-        if (project.allowed_origins) {
-            const allowedOrigins = project.allowed_origins.split(',').map(o => o.trim());
-            if (origin && allowedOrigins.includes(origin)) {
-                res.header('Access-Control-Allow-Origin', origin);
-            } else if (origin) {
-                // If origin is present but not allowed, block it
-                // Note: If you want to allow requests from tools (no origin), only block if origin is present
-                return res.status(403).json({ error: 'CORS policy: Origin not allowed' });
-            }
-        } else {
-            // Default: Allow all if no specific origins set (or handle as per requirement)
-            if (origin) {
-                res.header('Access-Control-Allow-Origin', '*');
-            }
-        }
+
 
         const geo = geoip.lookup(ip);
         const parser = new UAParser(req.headers['user-agent']);
@@ -460,13 +486,15 @@ exports.getVisitorCountPublic = async (req, res) => {
 
         const { data: project } = await supabase
             .from('projects')
-            .select('id')
+            .select('id, allowed_origins')
             .eq('tracking_id', trackingId)
             .single();
 
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
         }
+
+
 
         const { data: counter } = await supabase
             .from('counters')
@@ -480,3 +508,5 @@ exports.getVisitorCountPublic = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch count' });
     }
 };
+
+

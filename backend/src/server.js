@@ -18,7 +18,6 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'https://heyshree.site',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     methods: ['GET', 'POST'],
@@ -35,23 +34,31 @@ const cookieParser = require('cookie-parser');
 
 app.use(helmet());
 app.use(cookieParser());
-app.use(cors({
-  origin: (origin, callback) => {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'https://heyshree.site',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
+// Custom CORS wrapper to exclude tracking endpoint
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/track')) {
+    return next();
+  }
+  cors({
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        process.env.FRONTEND_URL
+      ].filter(Boolean);
 
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log('Not allowed CORS Origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "X-Requested-With", "Accept", "Pragma", "Origin", "Content-Length", "Expires"],
+    credentials: true
+  })(req, res, next);
+});
 app.use(express.json());
 
 // Routes
