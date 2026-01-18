@@ -270,9 +270,14 @@ export default function Dashboard() {
                   }`}></div>
                 <div>
                   <p className="text-sm text-white">
-                    {activity.action} <span className="text-slate-400">{activity.location && `from ${activity.location}`}</span>
+                    <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5">{activity.time}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    from <span className="text-slate-300">{activity.location}</span> on <span className="text-slate-300">{activity.site}</span>
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {new Date(activity.timestamp).toLocaleTimeString()}
+                  </p>
                 </div>
               </div>
             ))}

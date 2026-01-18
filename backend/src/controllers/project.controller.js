@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 exports.createProject = async (req, res) => {
     try {
-        const { name } = req.body;
+        const { name, allowedOrigins } = req.body;
         const userId = req.user.id;
 
         if (!name) {
@@ -28,7 +28,8 @@ exports.createProject = async (req, res) => {
             .insert({
                 name,
                 user_id: userId,
-                tracking_id: trackingId
+                tracking_id: trackingId,
+                allowed_origins: allowedOrigins || null
             })
             .select()
             .single();
@@ -106,6 +107,33 @@ exports.deleteProject = async (req, res) => {
     } catch (error) {
         console.error('Delete project error:', error);
         res.status(500).json({ error: 'Failed to delete project' });
+    }
+};
+
+exports.updateProject = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, allowedOrigins } = req.body;
+        const userId = req.user.id;
+
+        const updates = {};
+        if (name) updates.name = name;
+        if (allowedOrigins !== undefined) updates.allowed_origins = allowedOrigins;
+
+        const { data: updatedProject, error } = await supabase
+            .from('projects')
+            .update(updates)
+            .eq('id', id)
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(updatedProject);
+    } catch (error) {
+        console.error('Update project error:', error);
+        res.status(500).json({ error: 'Failed to update project' });
     }
 };
 
