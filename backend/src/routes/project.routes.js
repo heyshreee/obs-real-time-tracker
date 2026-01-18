@@ -8,6 +8,7 @@ router.use(auth); // Protect all project routes
 router.post('/', projectController.createProject);
 router.get('/', projectController.getProjects);
 router.get('/:id', projectController.getProject);
+router.put('/:id', projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 router.get('/:id/stats', projectController.getProjectStats);
 router.put('/:id/pin', projectController.togglePin);

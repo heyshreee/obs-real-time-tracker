@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom';
-import { ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2 } from 'lucide-react';
+import { ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2, Settings, Save, X } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +16,9 @@ export default function ProjectDetail() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [allowedOrigins, setAllowedOrigins] = useState('');
+  const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -31,6 +34,7 @@ export default function ProjectDetail() {
         apiRequest(`/projects/${id}/stats`),
       ]);
       setProject(projectData);
+      setAllowedOrigins(projectData.allowed_origins || '');
       setStats(statsData);
     } catch (err) {
       showToast(err.message, 'error');
@@ -62,6 +66,23 @@ export default function ProjectDetail() {
     } catch (err) {
       showToast(err.message, 'error');
       setDeleting(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const updatedProject = await apiRequest(`/projects/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ allowedOrigins }),
+      });
+      setProject(updatedProject);
+      setEditing(false);
+      showToast('Settings saved successfully', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -167,6 +188,72 @@ fetch("${trackingUrl}", {
             <pre>{trackingSnippet}</pre>
           </div>
           <CopyButton text={trackingSnippet} label="Copy Snippet" />
+        </div>
+      </div>
+
+      <div className="mt-6 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-white">Settings</h2>
+          </div>
+          {!editing ? (
+            <button
+              onClick={() => setEditing(true)}
+              className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setAllowedOrigins(project.allowed_origins || '');
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+                title="Cancel"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <button
+                onClick={handleSaveSettings}
+                disabled={saving}
+                className="p-1 text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                title="Save"
+              >
+                {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Allowed Origins
+            </label>
+            {editing ? (
+              <div>
+                <input
+                  type="text"
+                  value={allowedOrigins}
+                  onChange={(e) => setAllowedOrigins(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com, http://localhost:3000"
+                />
+                <p className="text-xs text-slate-500 mt-1">Comma separated list of domains allowed to track. Leave empty to allow all.</p>
+              </div>
+            ) : (
+              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 min-h-[42px] flex items-center">
+                {project.allowed_origins ? (
+                  <code className="text-sm text-slate-300 font-mono">{project.allowed_origins}</code>
+                ) : (
+                  <span className="text-sm text-slate-500 italic">All origins allowed</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ export default function Projects() {
     const [stats, setStats] = useState({});
     const [showModal, setShowModal] = useState(false);
     const [projectName, setProjectName] = useState('');
+    const [allowedOrigins, setAllowedOrigins] = useState('');
     const [loading, setLoading] = useState(true);
     const { showToast } = useToast();
 
@@ -54,9 +55,10 @@ export default function Projects() {
         try {
             await apiRequest('/projects', {
                 method: 'POST',
-                body: JSON.stringify({ name: projectName }),
+                body: JSON.stringify({ name: projectName, allowedOrigins }),
             });
             setProjectName('');
+            setAllowedOrigins('');
             setShowModal(false);
             showToast('Project created successfully!', 'success');
             loadProjects();
@@ -235,6 +237,7 @@ export default function Projects() {
                 onClose={() => {
                     setShowModal(false);
                     setProjectName('');
+                    setAllowedOrigins('');
                 }}
                 title="Create New Project"
             >
@@ -252,12 +255,26 @@ export default function Projects() {
                             placeholder="My Portfolio"
                         />
                     </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Allowed Origins (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            value={allowedOrigins}
+                            onChange={(e) => setAllowedOrigins(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://example.com, http://localhost:3000"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Comma separated list of domains allowed to track. Leave empty to allow all.</p>
+                    </div>
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
                             onClick={() => {
                                 setShowModal(false);
                                 setProjectName('');
+                                setAllowedOrigins('');
                             }}
                             className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                         >

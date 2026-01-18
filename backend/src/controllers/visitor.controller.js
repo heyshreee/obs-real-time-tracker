@@ -14,7 +14,10 @@ exports.trackVisitor = async (req, res) => {
         // If sessionId is missing, we might rely on IP, but let's assume client sends something or we generate it later.
         // Ideally, we generate sessionId first if missing, but for dedupe we need it now.
         // If sessionId is missing, we can't effectively dedupe without IP.
-        const ip = req.ip || req.connection.remoteAddress;
+        // Prioritize X-Forwarded-For for proxies (Vercel, Nginx, etc.)
+        const forwarded = req.headers['x-forwarded-for'];
+        const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
+
         const dedupeKey = `${trackingCode}-${sessionId || ip}-${pageUrl}`;
 
         if (requestCache.has(dedupeKey)) {
@@ -47,6 +50,10 @@ exports.trackVisitor = async (req, res) => {
         } else if (ip === '::1' || ip === '127.0.0.1' || ip.includes('127.0.0.1')) {
             country = 'Localhost';
             city = 'Local Machine';
+        } else {
+            // Try to handle cases where geoip fails but it's not localhost
+            // We can leave it as Unknown or try another lookup if available
+            // For now, 'Unknown' is better than 'Localhost' for public IPs
         }
 
         // 2. Update Counters (All-time views)
@@ -233,14 +240,28 @@ exports.getDashboardStats = async (req, res) => {
             .limit(5);
 
         const liveActivity = recentActivity?.map(v => {
-            const locationStr = [v.city, v.country].filter(Boolean).join(', ') || 'Unknown Location';
+            const city = v.city === 'Unknown' ? '' : v.city;
+            const country = v.country === 'Unknown' ? '' : v.country;
+            const location = [city, country].filter(Boolean).join(', ') || 'Unknown Location';
+
+            let site = 'Unknown Site';
+            let path = '/';
+            try {
+                const url = new URL(v.page_url);
+                site = url.hostname;
+                path = url.pathname;
+            } catch (e) {
+                site = v.page_url || 'Unknown';
+            }
+
             return {
                 id: v.id,
-                type: 'view', // or session
-                action: `Visitor from ${locationStr}`,
-                target: v.page_url,
-                time: new Date(v.last_seen).toLocaleTimeString(),
-                location: v.ip_address
+                type: 'view',
+                location,
+                ip: v.ip_address,
+                site,
+                path,
+                timestamp: v.last_seen
             };
         }) || [];
 
@@ -292,7 +313,8 @@ exports.trackVisitorPublic = async (req, res) => {
         const { trackingId } = req.params;
         const { sessionId, pageUrl, referrer } = req.body;
 
-        const ip = req.ip || req.connection.remoteAddress;
+        const forwarded = req.headers['x-forwarded-for'];
+        const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
 
         // Deduplication check
         const dedupeKey = `${trackingId}-${sessionId || ip}-${pageUrl}`;
@@ -304,12 +326,30 @@ exports.trackVisitorPublic = async (req, res) => {
 
         const { data: project } = await supabase
             .from('projects')
-            .select('id, user_id')
+            .select('id, user_id, allowed_origins')
             .eq('tracking_id', trackingId)
             .single();
 
         if (!project) {
             return res.status(404).json({ error: 'Invalid tracking code' });
+        }
+
+        // CORS Check
+        const origin = req.headers.origin;
+        if (project.allowed_origins) {
+            const allowedOrigins = project.allowed_origins.split(',').map(o => o.trim());
+            if (origin && allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+            } else if (origin) {
+                // If origin is present but not allowed, block it
+                // Note: If you want to allow requests from tools (no origin), only block if origin is present
+                return res.status(403).json({ error: 'CORS policy: Origin not allowed' });
+            }
+        } else {
+            // Default: Allow all if no specific origins set (or handle as per requirement)
+            if (origin) {
+                res.header('Access-Control-Allow-Origin', '*');
+            }
         }
 
         const geo = geoip.lookup(ip);
