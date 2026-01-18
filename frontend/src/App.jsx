@@ -9,6 +9,7 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Projects = lazy(() => import('./pages/Projects'));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
+const ProjectActivity = lazy(() => import('./pages/ProjectActivity'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Billing = lazy(() => import('./pages/Billing'));
 const Landing = lazy(() => import('./pages/Landing'));
@@ -41,6 +42,15 @@ function App() {
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
 
+                                <Route
+                                    path="/projects/:idOrName/activity"
+                                    element={
+                                        <PrivateRoute>
+                                            <ProjectActivity />
+                                        </PrivateRoute>
+                                    }
+                                />
+
                                 {/* Protected Routes wrapped in Layout */}
                                 <Route element={<Layout />}>
                                     <Route
@@ -59,8 +69,9 @@ function App() {
                                             </PrivateRoute>
                                         }
                                     />
+
                                     <Route
-                                        path="/projects/:id/:tab?"
+                                        path="/projects/:idOrName/:tab?"
                                         element={
                                             <PrivateRoute>
                                                 <ProjectDetail />

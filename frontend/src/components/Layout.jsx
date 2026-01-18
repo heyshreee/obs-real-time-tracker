@@ -142,7 +142,7 @@ export default function Layout() {
                             pinnedProjects.map((project) => (
                                 <Link
                                     key={project.id}
-                                    to={`/projects/${project.id}`}
+                                    to={`/projects/${encodeURIComponent(project.name)}`}
                                     className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-800/50 cursor-pointer group transition-colors"
                                 >
                                     <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors truncate">{project.name}</span>

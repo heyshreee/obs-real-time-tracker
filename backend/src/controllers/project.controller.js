@@ -1,5 +1,5 @@
 const supabase = require('../config/supabase');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 
 exports.createProject = async (req, res) => {
     try {
@@ -8,6 +8,10 @@ exports.createProject = async (req, res) => {
 
         if (!name) {
             return res.status(400).json({ error: 'Project name is required' });
+        }
+
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+            return res.status(400).json({ error: 'Project name can only contain letters, numbers, underscores, and hyphens' });
         }
 
         // Check if project with same name exists
@@ -73,12 +77,19 @@ exports.getProject = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
-        const { data: project, error } = await supabase
+        let query = supabase
             .from('projects')
             .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+            .eq('user_id', userId);
+
+        if (uuidValidate(id)) {
+            query = query.eq('id', id);
+        } else {
+            // Decode URL encoded name if necessary, though express usually handles it
+            query = query.eq('name', id);
+        }
+
+        const { data: project, error } = await query.single();
 
         if (error) throw error;
         if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -95,10 +106,23 @@ exports.deleteProject = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
+        let projectId = id;
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        }
+
         const { error } = await supabase
             .from('projects')
             .delete()
-            .eq('id', id)
+            .eq('id', projectId)
             .eq('user_id', userId);
 
         if (error) throw error;
@@ -116,14 +140,34 @@ exports.updateProject = async (req, res) => {
         const { name, allowedOrigins } = req.body;
         const userId = req.user.id;
 
+        let projectId = id;
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        }
+
         const updates = {};
-        if (name) updates.name = name;
+        if (name) {
+            if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+                return res.status(400).json({ error: 'Project name can only contain letters, numbers, underscores, and hyphens' });
+            }
+            updates.name = name;
+        }
         if (allowedOrigins !== undefined) updates.allowed_origins = allowedOrigins;
+        if (req.body.timezone) updates.timezone = req.body.timezone;
+        if (req.body.notifications) updates.notifications = req.body.notifications;
 
         const { data: updatedProject, error } = await supabase
             .from('projects')
             .update(updates)
-            .eq('id', id)
+            .eq('id', projectId)
             .eq('user_id', userId)
             .select()
             .single();
@@ -142,23 +186,40 @@ exports.getProjectStats = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
-        // Verify project ownership
-        const { data: project } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        let projectId = id;
 
-        if (!project) {
-            return res.status(404).json({ error: 'Project not found' });
+        // If id is not a UUID, resolve it to an ID first
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
+            projectId = project.id;
+        } else {
+            // Verify project ownership even if UUID
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('id', projectId)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
         }
 
         // Get total views from counters
         const { data: counter } = await supabase
             .from('counters')
             .select('count')
-            .eq('project_id', id)
+            .eq('project_id', projectId)
             .single();
 
         // Get current month views from usages
@@ -166,7 +227,7 @@ exports.getProjectStats = async (req, res) => {
         const { data: usage } = await supabase
             .from('usages')
             .select('views')
-            .eq('project_id', id)
+            .eq('project_id', projectId)
             .eq('month', currentMonth)
             .single();
 
@@ -185,11 +246,24 @@ exports.togglePin = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
+        let projectId = id;
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        }
+
         // First get current status
         const { data: project, error: fetchError } = await supabase
             .from('projects')
             .select('is_pinned')
-            .eq('id', id)
+            .eq('id', projectId)
             .eq('user_id', userId)
             .single();
 
@@ -200,7 +274,7 @@ exports.togglePin = async (req, res) => {
         const { data: updatedProject, error: updateError } = await supabase
             .from('projects')
             .update({ is_pinned: !project.is_pinned })
-            .eq('id', id)
+            .eq('id', projectId)
             .eq('user_id', userId)
             .select()
             .single();
@@ -211,5 +285,122 @@ exports.togglePin = async (req, res) => {
     } catch (error) {
         console.error('Toggle pin error:', error);
         res.status(500).json({ error: 'Failed to toggle pin status' });
+    }
+};
+
+exports.getProjectActivity = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const limit = parseInt(req.query.limit) || 50;
+
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        const { data: activity } = await supabase
+            .from('visitors')
+            .select('*')
+            .eq('project_id', project.id)
+            .order('last_seen', { ascending: false })
+            .limit(limit);
+
+        const activityList = activity?.map(v => {
+            const city = v.city === 'Unknown' ? '' : v.city;
+            const country = v.country === 'Unknown' ? '' : v.country;
+            const location = [city, country].filter(Boolean).join(', ') || 'Unknown Location';
+
+            let site = 'Unknown Site';
+            let path = '/';
+            try {
+                const url = new URL(v.page_url);
+                site = url.hostname;
+                path = url.pathname;
+            } catch (e) {
+                site = v.page_url || 'Unknown';
+            }
+
+            return {
+                id: v.id,
+                type: 'view',
+                location,
+                ip: v.ip_address,
+                site,
+                path,
+                timestamp: v.last_seen,
+                device: v.device_type
+            };
+        }) || [];
+
+        res.json(activityList);
+    } catch (error) {
+        console.error('Get activity error:', error);
+        res.status(500).json({ error: 'Failed to fetch activity' });
+    }
+};
+
+exports.getProjectPages = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const range = req.query.range || '30d';
+
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        let startDate = new Date();
+        if (range === '24h') startDate.setHours(startDate.getHours() - 24);
+        else if (range === '7d') startDate.setDate(startDate.getDate() - 6);
+        else startDate.setDate(startDate.getDate() - 29);
+        const startDateStr = startDate.toISOString();
+
+        const { data: pages } = await supabase
+            .from('page_views')
+            .select('page_url, title')
+            .eq('project_id', project.id)
+            .gte('created_at', startDateStr);
+
+        const pageMap = {};
+        pages?.forEach(p => {
+            try {
+                const url = new URL(p.page_url);
+                const path = url.pathname;
+                const key = path;
+
+                if (!pageMap[key]) {
+                    pageMap[key] = { views: 0, title: p.title || path };
+                }
+                pageMap[key].views++;
+                if (p.title && p.title !== 'Unknown Page') {
+                    pageMap[key].title = p.title;
+                }
+            } catch (e) {
+                const key = p.page_url;
+                if (!pageMap[key]) {
+                    pageMap[key] = { views: 0, title: p.title || key };
+                }
+                pageMap[key].views++;
+            }
+        });
+
+        const topPages = Object.entries(pageMap)
+            .map(([url, data]) => ({ url, views: data.views, title: data.title }))
+            .sort((a, b) => b.views - a.views);
+
+        res.json(topPages);
+    } catch (error) {
+        console.error('Get pages error:', error);
+        res.status(500).json({ error: 'Failed to fetch pages' });
     }
 };

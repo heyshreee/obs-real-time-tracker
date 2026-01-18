@@ -13,6 +13,8 @@ router.put('/:id', projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
 router.get('/:id/stats', projectController.getProjectStats);
 router.get('/:id/detailed-stats', visitorController.getProjectDetailedStats);
+router.get('/:id/activity', projectController.getProjectActivity);
+router.get('/:id/pages', projectController.getProjectPages);
 router.put('/:id/pin', projectController.togglePin);
 
 module.exports = router;

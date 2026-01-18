@@ -55,6 +55,11 @@ export default function Projects() {
         e.preventDefault();
         if (creating) return;
 
+        if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
+            showToast('Project name can only contain letters, numbers, underscores, and hyphens', 'error');
+            return;
+        }
+
         setCreating(true);
         try {
             await apiRequest('/projects', {
@@ -227,20 +232,30 @@ export default function Projects() {
             {/* Projects Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProjects.map((project) => (
-                    <div key={project.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col">
+                    <div
+                        key={project.id}
+                        onClick={() => navigate(`/projects/${encodeURIComponent(project.name)}`)}
+                        className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col cursor-pointer"
+                    >
                         <div className="flex justify-between items-start mb-4">
                             <div className="p-3 bg-blue-500/10 rounded-lg">
                                 <Layout className="h-6 w-6 text-blue-500" />
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                    onClick={() => handleTogglePin(project)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTogglePin(project);
+                                    }}
                                     className={`p-1.5 rounded-lg hover:bg-slate-800 transition-colors ${project.is_pinned ? 'text-blue-400 opacity-100' : 'text-slate-400'}`}
                                 >
                                     <Pin className={`h-4 w-4 ${project.is_pinned ? 'fill-current' : ''}`} />
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(project.id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(project.id);
+                                    }}
                                     className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -263,8 +278,7 @@ export default function Projects() {
                                 <span>{stats[project.id]?.total_views?.toLocaleString() || 0} views</span>
                             </div>
                             <Link
-                                to={`/projects/${project.id}`}
-                                target="_blank"
+                                to={`/projects/${encodeURIComponent(project.name)}`}
                                 className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-medium group/link"
                             >
                                 View Analytics
@@ -307,10 +321,9 @@ export default function Projects() {
                             type="text"
                             required
                             value={projectName}
-                            onChange={(e) => setProjectName(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="My Portfolio"
+                            placeholder="my-portfolio"
                         />
+                        <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
                     </div>
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-slate-300 mb-2">

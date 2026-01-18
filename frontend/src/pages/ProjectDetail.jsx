@@ -11,13 +11,15 @@ import {
 } from 'recharts';
 import { apiRequest } from '../utils/api';
 import CopyButton from '../components/CopyButton';
+import Modal from '../components/Modal';
+import TrafficTrendsChart from '../components/TrafficTrendsChart';
 import { useToast } from '../context/ToastContext';
 import { io } from 'socket.io-client';
 
 const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
 
 export default function ProjectDetail() {
-  const { id, tab } = useParams();
+  const { idOrName, tab } = useParams();
   const navigate = useNavigate();
   const { user, loadUser } = useOutletContext();
   const [project, setProject] = useState(null);
@@ -31,6 +33,7 @@ export default function ProjectDetail() {
     avgSessionDuration: '0m 0s'
   });
   const [loading, setLoading] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(false);
   const [activeTab, setActiveTab] = useState(tab || 'overview');
   const { showToast } = useToast();
   const [timeRange, setTimeRange] = useState('7d'); // Default for project view
@@ -46,7 +49,15 @@ export default function ProjectDetail() {
     trafficSpikes: true,
     weeklyDigest: false
   });
+
   const [saving, setSaving] = useState(false);
+
+  // Modal State
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showPagesModal, setShowPagesModal] = useState(false);
+  const [activityData, setActivityData] = useState([]);
+  const [pagesData, setPagesData] = useState([]);
+  const [loadingModalData, setLoadingModalData] = useState(false);
 
   useEffect(() => {
     if (tab) {
@@ -57,7 +68,12 @@ export default function ProjectDetail() {
   }, [tab]);
 
   useEffect(() => {
-    loadData();
+    setLoadingChart(true);
+    loadData().finally(() => setLoadingChart(false));
+  }, [idOrName, timeRange]);
+
+  useEffect(() => {
+    if (!project?.id) return;
 
     // Socket connection
     const socket = io(API_URL, {
@@ -66,28 +82,30 @@ export default function ProjectDetail() {
 
     socket.on('visitor_update', (data) => {
       if (project && data.project_id && data.project_id !== project.id) return;
-      loadStats(false);
+      loadStats(project.id, false);
     });
 
-    const interval = setInterval(() => loadStats(false), 1000);
+    const interval = setInterval(() => loadStats(project.id, false), 5000);
 
     return () => {
       clearInterval(interval);
       socket.disconnect();
     };
-  }, [id, timeRange]);
+  }, [project?.id, timeRange, timezone]);
 
   const loadData = async () => {
     try {
       const [projectData, statsData, detailedStats] = await Promise.all([
-        apiRequest(`/projects/${id}`),
-        apiRequest(`/projects/${id}/stats`),
-        apiRequest(`/projects/${id}/detailed-stats?range=${timeRange}`).catch(() => null)
+        apiRequest(`/projects/${idOrName}`),
+        apiRequest(`/projects/${idOrName}/stats`),
+        apiRequest(`/projects/${idOrName}/detailed-stats?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`).catch(() => null)
       ]);
       setProject(projectData);
       setProjectName(projectData.name);
       setAllowedOrigins(projectData.allowed_origins || '');
       setTargetUrl(projectData.allowed_origins ? projectData.allowed_origins.split(',')[0] : '');
+      if (projectData.timezone) setTimezone(projectData.timezone);
+      if (projectData.notifications) setNotifications(projectData.notifications);
 
       setStats(statsData);
       if (detailedStats) {
@@ -97,14 +115,16 @@ export default function ProjectDetail() {
       showToast(err.message, 'error');
     } finally {
       setLoading(false);
+      setLoadingChart(false);
     }
   };
 
-  const loadStats = async (showLoading = false) => {
+  const loadStats = async (projectId, showLoading = false) => {
+    if (!projectId) return;
     try {
       const [statsData, detailedStats] = await Promise.all([
-        apiRequest(`/projects/${id}/stats`),
-        apiRequest(`/projects/${id}/detailed-stats?range=${timeRange}`)
+        apiRequest(`/projects/${projectId}/stats`),
+        apiRequest(`/projects/${projectId}/detailed-stats?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`)
       ]);
       setStats(statsData);
       setOverviewStats(detailedStats);
@@ -115,7 +135,7 @@ export default function ProjectDetail() {
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
-    navigate(`/projects/${id}/${newTab}`);
+    navigate(`/projects/${idOrName}/${newTab}`);
   };
 
   const handleDelete = async () => {
@@ -123,7 +143,7 @@ export default function ProjectDetail() {
 
     setDeleting(true);
     try {
-      await apiRequest(`/projects/${id}`, { method: 'DELETE' });
+      await apiRequest(`/projects/${project.id}`, { method: 'DELETE' });
       showToast('Project deleted successfully', 'success');
       loadUser();
       navigate('/projects');
@@ -142,21 +162,60 @@ export default function ProjectDetail() {
       if (activeTab === 'settings') {
         body.allowedOrigins = allowedOrigins;
       } else if (activeTab === 'profile') {
+        if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
+          showToast('Project name can only contain letters, numbers, underscores, and hyphens', 'error');
+          setSaving(false);
+          return;
+        }
         body.name = projectName;
         body.allowedOrigins = targetUrl; // Simple mapping for now
+        body.timezone = timezone;
+        body.notifications = notifications;
       }
 
-      const updatedProject = await apiRequest(`/projects/${id}`, {
+      const updatedProject = await apiRequest(`/projects/${project.id}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });
       setProject(updatedProject);
       setEditing(false);
       showToast('Changes saved successfully', 'success');
+
+      // If name changed, navigate to new URL
+      if (body.name && body.name !== idOrName) {
+        navigate(`/projects/${body.name}/${activeTab}`, { replace: true });
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+
+  };
+
+  const handleViewAllActivity = async () => {
+    setShowActivityModal(true);
+    setLoadingModalData(true);
+    try {
+      const data = await apiRequest(`/projects/${project.id}/activity?limit=100`);
+      setActivityData(data);
+    } catch (err) {
+      showToast('Failed to load activity', 'error');
+    } finally {
+      setLoadingModalData(false);
+    }
+  };
+
+  const handleViewAllPages = async () => {
+    setShowPagesModal(true);
+    setLoadingModalData(true);
+    try {
+      const data = await apiRequest(`/projects/${project.id}/pages?range=${timeRange}`);
+      setPagesData(data);
+    } catch (err) {
+      showToast('Failed to load pages', 'error');
+    } finally {
+      setLoadingModalData(false);
     }
   };
 
@@ -179,7 +238,8 @@ export default function ProjectDetail() {
     body: JSON.stringify({
       sessionId: sessionId,
       pageUrl: window.location.href,
-      referrer: document.referrer
+      referrer: document.referrer,
+      title: document.title
     })
   }).catch(console.error);
 })();
@@ -270,61 +330,26 @@ export default function ProjectDetail() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Traffic Trends */}
-            <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Traffic Trends</h3>
-                  <p className="text-sm text-slate-400">Visitor activity over the last 7 days</p>
-                </div>
-                <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                  <button className="px-3 py-1 text-xs font-medium bg-slate-800 text-white rounded-md">Last 7 days</button>
-                </div>
-              </div>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={overviewStats.trafficData || []}>
-                    <defs>
-                      <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      stroke="#64748b"
-                      tick={{ fill: '#64748b', fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="#64748b"
-                      tick={{ fill: '#64748b', fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
-                      itemStyle={{ color: '#3B82F6' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="views"
-                      stroke="#3B82F6"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#colorViews)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="lg:col-span-2">
+              <TrafficTrendsChart
+                data={overviewStats.trafficData}
+                timeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
+                loading={loadingChart}
+                title="Traffic Trends"
+                subtitle="Visitor activity over the last 7 days"
+              />
             </div>
 
             {/* Recent Activity */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
-                <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">LIVE FEED</span>
+                <div className="flex items-center gap-3">
+                  <Link to={`/projects/${encodeURIComponent(project?.name)}/activity`} target="_blank" className="text-xs text-blue-400 hover:text-blue-300 font-medium">View All</Link>
+                  <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">LIVE FEED</span>
+                </div>
               </div>
               <div className="space-y-0">
                 {overviewStats.recentActivity?.map((activity, i) => (
@@ -336,10 +361,10 @@ export default function ProjectDetail() {
                     <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
                     <div>
                       <p className="text-sm text-white">
-                        <span className="font-medium">Page View</span>
+                        <span className="font-medium">{activity.title || 'Unknown Page'}</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                        {activity.path}
+                        {activity.device || 'Unknown'} - {activity.ip || 'Unknown IP'}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-slate-500 flex items-center gap-1">
@@ -391,64 +416,15 @@ export default function ProjectDetail() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Traffic Flow Chart (Analytics View) */}
-            <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Traffic Flow</h3>
-                  <p className="text-sm text-slate-400">Visitor activity over time</p>
-                </div>
-                <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                  {['24h', '7d', '30d'].map((range) => (
-                    <button
-                      key={range}
-                      onClick={() => setTimeRange(range)}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === range ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      {range.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={overviewStats.trafficData || []}>
-                    <defs>
-                      <linearGradient id="colorViewsAnalytics" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      stroke="#64748b"
-                      tick={{ fill: '#64748b', fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      minTickGap={30}
-                    />
-                    <YAxis
-                      stroke="#64748b"
-                      tick={{ fill: '#64748b', fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
-                      itemStyle={{ color: '#3B82F6' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="views"
-                      stroke="#3B82F6"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#colorViewsAnalytics)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="lg:col-span-2">
+              <TrafficTrendsChart
+                data={overviewStats.trafficData}
+                timeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
+                loading={loadingChart}
+                title="Traffic Flow"
+                subtitle="Visitor activity over time"
+              />
             </div>
 
             {/* Active Visitors Card */}
@@ -459,14 +435,8 @@ export default function ProjectDetail() {
                 <div className="text-6xl font-bold text-white mb-4 tracking-tight">
                   {overviewStats?.realTimeVisitors?.toLocaleString() || 0}
                 </div>
-                <div className="flex gap-1 justify-center">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-1.5 h-6 bg-blue-500 rounded-full animate-pulse"
-                      style={{ animationDelay: `${i * 0.1}s`, opacity: 0.5 + (i * 0.1) }}
-                    />
-                  ))}
+                <div className="flex justify-center mt-2">
+                  <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
                 </div>
               </div>
             </div>
@@ -477,7 +447,7 @@ export default function ProjectDetail() {
             <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">Top Pages</h3>
-                <button className="text-sm text-blue-400 hover:text-blue-300">View All</button>
+                <button onClick={handleViewAllPages} className="text-sm text-blue-400 hover:text-blue-300">View All</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -490,7 +460,7 @@ export default function ProjectDetail() {
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {stats?.topPages?.map((page, i) => (
+                    {overviewStats?.topPages?.map((page, i) => (
                       <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                         <td className="py-3 pl-2 text-white font-medium truncate max-w-[200px]">{page.url}</td>
                         <td className="py-3 text-right text-slate-300">{page.views.toLocaleString()}</td>
@@ -498,7 +468,7 @@ export default function ProjectDetail() {
                         <td className="py-3 text-right pr-2 text-green-400">--</td>
                       </tr>
                     ))}
-                    {(!stats?.topPages || stats.topPages.length === 0) && (
+                    {(!overviewStats?.topPages || overviewStats.topPages.length === 0) && (
                       <tr>
                         <td colSpan="4" className="py-8 text-center text-slate-500">No data available</td>
                       </tr>
@@ -515,7 +485,7 @@ export default function ProjectDetail() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={stats?.deviceStats || []}
+                      data={overviewStats?.deviceStats || []}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -523,7 +493,7 @@ export default function ProjectDetail() {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {stats?.deviceStats?.map((entry, index) => (
+                      {overviewStats?.deviceStats?.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                       ))}
                     </Pie>
@@ -538,18 +508,18 @@ export default function ProjectDetail() {
                 </div>
               </div>
               <div className="mt-6 space-y-3">
-                {stats?.deviceStats?.map((device, i) => (
+                {overviewStats?.deviceStats?.map((device, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: device.color }} />
                       <span className="text-slate-300">{device.name}</span>
                     </div>
                     <span className="text-white font-medium">
-                      {Math.round((device.value / (stats.deviceStats.reduce((a, b) => a + b.value, 0) || 1)) * 100)}%
+                      {Math.round((device.value / (overviewStats.deviceStats.reduce((a, b) => a + b.value, 0) || 1)) * 100)}%
                     </span>
                   </div>
                 ))}
-                {(!stats?.deviceStats || stats.deviceStats.length === 0) && (
+                {(!overviewStats?.deviceStats || overviewStats.deviceStats.length === 0) && (
                   <p className="text-center text-slate-500 text-sm">No device data</p>
                 )}
               </div>
@@ -653,115 +623,203 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
-      {activeTab === 'profile' && (
-        <div className="space-y-6">
-          {/* Project Information */}
-          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
-            <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
+      {
+        activeTab === 'profile' && (
+          <div className="space-y-6">
+            {/* Project Information */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
+              <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Target URL</label>
+                  <input
+                    type="text"
+                    value={targetUrl}
+                    onChange={(e) => setTargetUrl(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Target URL</label>
-                <input
-                  type="text"
-                  value={targetUrl}
-                  onChange={(e) => setTargetUrl(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                >
+                  <option value="Asia/Kolkata">(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
+                  <option value="UTC">(GMT+00:00) UTC</option>
+                  <option value="America/New_York">(GMT-05:00) Eastern Time (US & Canada)</option>
+                  <option value="America/Los_Angeles">(GMT-08:00) Pacific Time (US & Canada)</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleSaveSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                <option>(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
-                <option>(GMT+00:00) UTC</option>
-                <option>(GMT-05:00) Eastern Time (US & Canada)</option>
-                <option>(GMT-08:00) Pacific Time (US & Canada)</option>
-              </select>
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Changes
+              </button>
             </div>
 
-            <button
-              onClick={handleSaveSettings}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save Changes
-            </button>
-          </div>
+            {/* Notification Preferences */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-1">Notification Preferences</h2>
+              <p className="text-sm text-slate-400 mb-6">Stay updated on your website's traffic performance.</p>
 
-          {/* Notification Preferences */}
-          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-1">Notification Preferences</h2>
-            <p className="text-sm text-slate-400 mb-6">Stay updated on your website's traffic performance.</p>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-white">Traffic Spikes</h3>
-                  <p className="text-xs text-slate-400">Get an email notification when traffic increases by more than 50% in an hour.</p>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Traffic Spikes</h3>
+                    <p className="text-xs text-slate-400">Get an email notification when traffic increases by more than 50% in an hour.</p>
+                  </div>
+                  <button
+                    onClick={() => setNotifications(prev => ({ ...prev, trafficSpikes: !prev.trafficSpikes }))}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${notifications.trafficSpikes ? 'bg-blue-600' : 'bg-slate-700'}`}
+                  >
+                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.trafficSpikes ? 'translate-x-5' : ''}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setNotifications(prev => ({ ...prev, trafficSpikes: !prev.trafficSpikes }))}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.trafficSpikes ? 'bg-blue-600' : 'bg-slate-700'}`}
-                >
-                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.trafficSpikes ? 'translate-x-5' : ''}`} />
-                </button>
-              </div>
 
-              <div className="flex items-center justify-between border-t border-slate-800 pt-6">
-                <div>
-                  <h3 className="text-sm font-medium text-white">Weekly Digest</h3>
-                  <p className="text-xs text-slate-400">Receive a weekly summary of your top performing pages and visitor growth.</p>
+                <div className="flex items-center justify-between border-t border-slate-800 pt-6">
+                  <div>
+                    <h3 className="text-sm font-medium text-white">Weekly Digest</h3>
+                    <p className="text-xs text-slate-400">Receive a weekly summary of your top performing pages and visitor growth.</p>
+                  </div>
+                  <button
+                    onClick={() => setNotifications(prev => ({ ...prev, weeklyDigest: !prev.weeklyDigest }))}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${notifications.weeklyDigest ? 'bg-blue-600' : 'bg-slate-700'}`}
+                  >
+                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.weeklyDigest ? 'translate-x-5' : ''}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setNotifications(prev => ({ ...prev, weeklyDigest: !prev.weeklyDigest }))}
-                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.weeklyDigest ? 'bg-blue-600' : 'bg-slate-700'}`}
-                >
-                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.weeklyDigest ? 'translate-x-5' : ''}`} />
-                </button>
               </div>
             </div>
-          </div>
 
-          {/* Delete Project */}
-          <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-500/10 rounded-lg">
-                <Trash2 className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
-                <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
-                >
-                  {deleting ? 'Deleting...' : 'Delete This Project'}
-                </button>
+            {/* Delete Project */}
+            <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-red-500/10 rounded-lg">
+                  <Trash2 className="h-6 w-6 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
+                  <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete This Project'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        )
+      }
+      {/* Modals */}
+      <Modal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        title="Recent Activity Log"
+      >
+        <div className="max-h-[60vh] overflow-y-auto pr-2">
+          {loadingModalData ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activityData.map((activity, i) => (
+                <div key={i} className="flex gap-4 pb-4 border-b border-slate-800/50 last:border-0">
+                  <div className="w-2 h-2 rounded-full mt-2 bg-blue-500 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <p className="text-sm text-white font-medium">{activity.path}</p>
+                      <span className="text-xs text-slate-500">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{activity.site}</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <Globe className="h-3 w-3" /> {activity.location}
+                      </span>
+                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <Monitor className="h-3 w-3" /> {activity.device || 'Desktop'}
+                      </span>
+                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <Activity className="h-3 w-3" /> {activity.ip}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {activityData.length === 0 && (
+                <p className="text-center text-slate-500 py-4">No activity found</p>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPagesModal}
+        onClose={() => setShowPagesModal(false)}
+        title={`Top Pages (${timeRange.toUpperCase()})`}
+      >
+        <div className="max-h-[60vh] overflow-y-auto">
+          {loadingModalData ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-800 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                  <th className="pb-3 pl-2">Page Title / URL</th>
+                  <th className="pb-3 text-right pr-2">Views</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {pagesData.map((page, i) => (
+                  <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                    <td className="py-3 pl-2">
+                      <div className="text-white font-medium truncate max-w-[300px]">{page.title || page.url}</div>
+                      <div className="text-xs text-slate-500 truncate max-w-[300px]">{page.url}</div>
+                    </td>
+                    <td className="py-3 text-right pr-2 text-slate-300">{page.views.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {pagesData.length === 0 && (
+                  <tr>
+                    <td colSpan="2" className="py-8 text-center text-slate-500">No data available</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Modal>
+    </div >
   );
 }
