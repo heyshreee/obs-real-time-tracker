@@ -180,38 +180,80 @@ exports.getDashboardStats = async (req, res) => {
             .eq('is_active', true)
             .gte('last_seen', fiveMinutesAgo);
 
-        // 2. Traffic Trends (Last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+        // 2. Traffic Trends
+        const range = req.query.range || '30d';
+        let startDate = new Date();
+        let groupBy = 'day'; // 'day' or 'hour'
+
+        if (range === '24h') {
+            startDate.setHours(startDate.getHours() - 24);
+            groupBy = 'hour';
+        } else if (range === '7d') {
+            startDate.setDate(startDate.getDate() - 6);
+            groupBy = 'day';
+        } else {
+            // 30d default
+            startDate.setDate(startDate.getDate() - 29);
+            groupBy = 'day';
+        }
+        const startDateStr = startDate.toISOString();
 
         const { data: dailyViews } = await supabase
             .from('page_views')
             .select('created_at')
             .eq('user_id', userId)
-            .gte('created_at', thirtyDaysAgoStr);
+            .gte('created_at', startDateStr);
 
-        // Aggregate daily views
         const trafficMap = {};
-        // Initialize last 30 days
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            const dateStr = d.toISOString().split('T')[0];
-            trafficMap[dateStr] = 0;
+
+        if (range === '24h') {
+            // Initialize last 24 hours
+            for (let i = 23; i >= 0; i--) {
+                const d = new Date();
+                d.setHours(d.getHours() - i);
+                const hourStr = d.toISOString().slice(0, 13) + ':00:00.000Z'; // YYYY-MM-DDTHH:00...
+                // Use local time label for map key to match view logic or keep ISO for sorting?
+                // Let's use ISO key for sorting, format later
+                trafficMap[hourStr] = 0;
+            }
+        } else {
+            // Initialize days
+            const days = range === '7d' ? 6 : 29;
+            for (let i = days; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                trafficMap[dateStr] = 0;
+            }
         }
 
         dailyViews?.forEach(v => {
-            const dateStr = v.created_at.split('T')[0];
-            if (trafficMap[dateStr] !== undefined) {
-                trafficMap[dateStr]++;
+            let key;
+            if (range === '24h') {
+                // Round down to hour
+                key = v.created_at.slice(0, 13) + ':00:00.000Z';
+            } else {
+                key = v.created_at.split('T')[0];
+            }
+
+            if (trafficMap[key] !== undefined) {
+                trafficMap[key]++;
             }
         });
 
-        const trafficData = Object.keys(trafficMap).map(key => ({
-            name: new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            views: trafficMap[key]
-        }));
+        const trafficData = Object.keys(trafficMap).map(key => {
+            let name;
+            if (range === '24h') {
+                name = new Date(key).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                name = new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            return {
+                name,
+                views: trafficMap[key],
+                fullDate: key
+            };
+        });
 
         // 3. Top Referral Sources
         const { data: sources } = await supabase
@@ -469,7 +511,7 @@ exports.trackVisitorPublic = async (req, res) => {
             });
 
             if (global.io) {
-                global.io.to(`user_${project.user_id}`).emit('visitor_update', visitor);
+                global.io.to(`user_${project.user_id}`).emit('visitor_update', { ...visitor, project_id: project.id });
             }
         }
 
@@ -506,6 +548,181 @@ exports.getVisitorCountPublic = async (req, res) => {
     } catch (error) {
         console.error('Get public count error:', error);
         res.status(500).json({ error: 'Failed to fetch count' });
+    }
+};
+
+exports.getProjectDetailedStats = async (req, res) => {
+    try {
+        const { id } = req.params; // Project ID
+        const userId = req.user.id;
+
+        // Verify project ownership
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id, tracking_id, allowed_origins')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // 1. Real-time Visitors (Last 5 mins)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { count: realTimeVisitors } = await supabase
+            .from('visitors')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .gte('last_seen', fiveMinutesAgo);
+
+        // 2. Traffic Trends
+        const range = req.query.range || '7d';
+        let startDate = new Date();
+
+        if (range === '24h') {
+            startDate.setHours(startDate.getHours() - 24);
+        } else if (range === '30d') {
+            startDate.setDate(startDate.getDate() - 29);
+        } else {
+            // 7d default
+            startDate.setDate(startDate.getDate() - 6);
+        }
+        const startDateStr = startDate.toISOString();
+
+        const { data: dailyViews } = await supabase
+            .from('page_views')
+            .select('created_at')
+            .eq('user_id', userId)
+            .gte('created_at', startDateStr);
+
+        const trafficMap = {};
+
+        if (range === '24h') {
+            for (let i = 23; i >= 0; i--) {
+                const d = new Date();
+                d.setHours(d.getHours() - i);
+                const hourStr = d.toISOString().slice(0, 13) + ':00:00.000Z';
+                trafficMap[hourStr] = 0;
+            }
+        } else {
+            const days = range === '30d' ? 29 : 6;
+            for (let i = days; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                trafficMap[dateStr] = 0;
+            }
+        }
+
+        dailyViews?.forEach(v => {
+            let key;
+            if (range === '24h') {
+                key = v.created_at.slice(0, 13) + ':00:00.000Z';
+            } else {
+                key = v.created_at.split('T')[0];
+            }
+            if (trafficMap[key] !== undefined) {
+                trafficMap[key]++;
+            }
+        });
+
+        const trafficData = Object.keys(trafficMap).map(key => {
+            let name;
+            if (range === '24h') {
+                name = new Date(key).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                name = new Date(key).toLocaleDateString('en-US', { weekday: 'short' });
+            }
+            return {
+                name,
+                views: trafficMap[key],
+                fullDate: key
+            };
+        });
+
+        // 3. Recent Activity (Last 10 events)
+        const { data: recentActivity } = await supabase
+            .from('visitors')
+            .select('*')
+            .eq('user_id', userId)
+            .order('last_seen', { ascending: false })
+            .limit(10);
+
+        const activityList = recentActivity?.map(v => {
+            const city = v.city === 'Unknown' ? '' : v.city;
+            const country = v.country === 'Unknown' ? '' : v.country;
+            const location = [city, country].filter(Boolean).join(', ') || 'Unknown Location';
+
+            let site = 'Unknown Site';
+            let path = '/';
+            try {
+                const url = new URL(v.page_url);
+                site = url.hostname;
+                path = url.pathname;
+            } catch (e) {
+                site = v.page_url || 'Unknown';
+            }
+
+            return {
+                id: v.id,
+                type: 'view',
+                location,
+                ip: v.ip_address,
+                site,
+                path,
+                timestamp: v.last_seen,
+                device: v.device_type
+            };
+        }) || [];
+
+        // 4. Top Referrers
+        const { data: sources } = await supabase
+            .from('visitors')
+            .select('referrer')
+            .eq('user_id', userId);
+
+        const sourceMap = {};
+        sources?.forEach(s => {
+            let ref = 'Direct';
+            if (s.referrer) {
+                try {
+                    ref = new URL(s.referrer).hostname;
+                } catch (e) {
+                    ref = s.referrer;
+                }
+            }
+            sourceMap[ref] = (sourceMap[ref] || 0) + 1;
+        });
+
+        const topReferrers = Object.entries(sourceMap)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5)
+            .map((s, i) => ({ ...s, color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i] || '#CBD5E1' }));
+
+        // 5. Unique Visitors (Total)
+        const { count: uniqueVisitors } = await supabase
+            .from('visitors')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        // 6. Avg Session Duration (Mocked for now)
+        const avgSessionDuration = "2m 45s";
+
+        res.json({
+            realTimeVisitors: realTimeVisitors || 0,
+            trafficData,
+            recentActivity: activityList,
+            topReferrers,
+            uniqueVisitors: uniqueVisitors || 0,
+            avgSessionDuration
+        });
+
+    } catch (error) {
+        console.error('Get project detailed stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch project stats' });
     }
 };
 

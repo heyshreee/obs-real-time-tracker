@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom';
 import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
-  Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet
+  Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
+  Users, Clock, TrendingUp, Globe, Bell, Trash2
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -11,40 +12,87 @@ import {
 import { apiRequest } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import { useToast } from '../context/ToastContext';
+import { io } from 'socket.io-client';
 
 const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
 
 export default function ProjectDetail() {
-  const { id } = useParams();
+  const { id, tab } = useParams();
   const navigate = useNavigate();
   const { user, loadUser } = useOutletContext();
   const [project, setProject] = useState(null);
   const [stats, setStats] = useState(null);
+  const [overviewStats, setOverviewStats] = useState({
+    realTimeVisitors: 0,
+    trafficData: [],
+    recentActivity: [],
+    topReferrers: [],
+    uniqueVisitors: 0,
+    avgSessionDuration: '0m 0s'
+  });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('analytics');
+  const [activeTab, setActiveTab] = useState(tab || 'overview');
   const { showToast } = useToast();
+  const [timeRange, setTimeRange] = useState('7d'); // Default for project view
 
-  // Settings State
+  // Settings/Profile State
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [allowedOrigins, setAllowedOrigins] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [targetUrl, setTargetUrl] = useState('');
+  const [timezone, setTimezone] = useState('(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi');
+  const [notifications, setNotifications] = useState({
+    trafficSpikes: true,
+    weeklyDigest: false
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (tab) {
+      setActiveTab(tab);
+    } else {
+      setActiveTab('overview');
+    }
+  }, [tab]);
+
+  useEffect(() => {
     loadData();
-    const interval = setInterval(loadStats, 5000);
-    return () => clearInterval(interval);
-  }, [id]);
+
+    // Socket connection
+    const socket = io(API_URL, {
+      withCredentials: true
+    });
+
+    socket.on('visitor_update', (data) => {
+      if (project && data.project_id && data.project_id !== project.id) return;
+      loadStats(false);
+    });
+
+    const interval = setInterval(() => loadStats(false), 1000);
+
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
+  }, [id, timeRange]);
 
   const loadData = async () => {
     try {
-      const [projectData, statsData] = await Promise.all([
+      const [projectData, statsData, detailedStats] = await Promise.all([
         apiRequest(`/projects/${id}`),
         apiRequest(`/projects/${id}/stats`),
+        apiRequest(`/projects/${id}/detailed-stats?range=${timeRange}`).catch(() => null)
       ]);
       setProject(projectData);
+      setProjectName(projectData.name);
       setAllowedOrigins(projectData.allowed_origins || '');
+      setTargetUrl(projectData.allowed_origins ? projectData.allowed_origins.split(',')[0] : '');
+
       setStats(statsData);
+      if (detailedStats) {
+        setOverviewStats(detailedStats);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -52,13 +100,22 @@ export default function ProjectDetail() {
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (showLoading = false) => {
     try {
-      const statsData = await apiRequest(`/projects/${id}/stats`);
+      const [statsData, detailedStats] = await Promise.all([
+        apiRequest(`/projects/${id}/stats`),
+        apiRequest(`/projects/${id}/detailed-stats?range=${timeRange}`)
+      ]);
       setStats(statsData);
+      setOverviewStats(detailedStats);
     } catch (err) {
       // Silent fail
     }
+  };
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    navigate(`/projects/${id}/${newTab}`);
   };
 
   const handleDelete = async () => {
@@ -79,13 +136,23 @@ export default function ProjectDetail() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
+      // Update allowed origins if editing in Settings tab
+      // Update name/targetUrl if editing in Profile tab
+      const body = {};
+      if (activeTab === 'settings') {
+        body.allowedOrigins = allowedOrigins;
+      } else if (activeTab === 'profile') {
+        body.name = projectName;
+        body.allowedOrigins = targetUrl; // Simple mapping for now
+      }
+
       const updatedProject = await apiRequest(`/projects/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ allowedOrigins }),
+        body: JSON.stringify(body),
       });
       setProject(updatedProject);
       setEditing(false);
-      showToast('Settings saved successfully', 'success');
+      showToast('Changes saved successfully', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -145,51 +212,209 @@ export default function ProjectDetail() {
       {/* Tabs */}
       <div className="border-b border-slate-800">
         <div className="flex gap-6">
-          {['Overview', 'Project Analytics', 'Settings', 'Profile'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                if (tab === 'Project Analytics') setActiveTab('analytics');
-                if (tab === 'Settings') setActiveTab('settings');
-              }}
-              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${(tab === 'Project Analytics' && activeTab === 'analytics') || (tab === 'Settings' && activeTab === 'settings')
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-white'
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {['Overview', 'Project Analytics', 'Settings', 'Profile'].map((tabName) => {
+            const tabKey = tabName.toLowerCase().replace(' ', '-');
+            const isActive = activeTab === (tabName === 'Project Analytics' ? 'analytics' : tabKey);
+            return (
+              <button
+                key={tabName}
+                onClick={() => handleTabChange(tabName === 'Project Analytics' ? 'analytics' : tabKey)}
+                className={`pb-3 text-sm font-medium border-b-2 transition-colors ${isActive
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-white'
+                  }`}
+              >
+                {tabName}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {activeTab === 'analytics' ? (
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-slate-400">Total Views</h3>
+                <Eye className="h-5 w-5 text-blue-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-white">{stats?.total_views?.toLocaleString() || 0}</span>
+                <span className="text-xs font-medium text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">+12%</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-slate-400">Unique Visitors</h3>
+                <Users className="h-5 w-5 text-purple-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-white">{overviewStats.uniqueVisitors?.toLocaleString() || 0}</span>
+                <span className="text-xs font-medium text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">+8%</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-slate-400">Avg. Session Duration</h3>
+                <Clock className="h-5 w-5 text-orange-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-white">{overviewStats.avgSessionDuration}</span>
+                <span className="text-xs font-medium text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">-3%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Traffic Trends */}
+            <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Traffic Trends</h3>
+                  <p className="text-sm text-slate-400">Visitor activity over the last 7 days</p>
+                </div>
+                <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                  <button className="px-3 py-1 text-xs font-medium bg-slate-800 text-white rounded-md">Last 7 days</button>
+                </div>
+              </div>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={overviewStats.trafficData || []}>
+                    <defs>
+                      <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      stroke="#64748b"
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#64748b"
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc' }}
+                      itemStyle={{ color: '#3B82F6' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="views"
+                      stroke="#3B82F6"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorViews)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
+                <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">LIVE FEED</span>
+              </div>
+              <div className="space-y-0">
+                {overviewStats.recentActivity?.map((activity, i) => (
+                  <div key={i} className="flex gap-4 relative pb-6 last:pb-0">
+                    {/* Vertical line */}
+                    {i !== overviewStats.recentActivity.length - 1 && (
+                      <div className="absolute left-[5px] top-2 bottom-0 w-px bg-slate-800"></div>
+                    )}
+                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                    <div>
+                      <p className="text-sm text-white">
+                        <span className="font-medium">Page View</span>
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                        {activity.path}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                          <Globe className="h-3 w-3" /> {activity.location}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(!overviewStats.recentActivity || overviewStats.recentActivity.length === 0) && (
+                  <p className="text-center text-slate-500 text-sm py-4">No recent activity</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Referrers */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-6">Top Referrers</h3>
+              <div className="space-y-4">
+                {overviewStats.topReferrers?.map((referrer, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-white font-medium">{referrer.name}</span>
+                      <span className="text-slate-400">{referrer.value.toLocaleString()} views ({Math.round((referrer.value / (overviewStats.total_views || 1)) * 100)}%)</span>
+                    </div>
+                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.min((referrer.value / (overviewStats.topReferrers[0]?.value || 1)) * 100, 100)}%`, backgroundColor: referrer.color }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+                {(!overviewStats.topReferrers || overviewStats.topReferrers.length === 0) && (
+                  <p className="text-center text-slate-500 text-sm">No referrer data</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Traffic Flow Chart */}
+            {/* Traffic Flow Chart (Analytics View) */}
             <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-semibold text-white">Traffic Flow</h3>
-                  <p className="text-sm text-slate-400">Visitor activity over the last 30 days</p>
+                  <p className="text-sm text-slate-400">Visitor activity over time</p>
                 </div>
                 <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                  {['24H', '7D', '30D'].map((range) => (
+                  {['24h', '7d', '30d'].map((range) => (
                     <button
                       key={range}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${range === '30D' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+                      onClick={() => setTimeRange(range)}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === range ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                      {range}
+                      {range.toUpperCase()}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats?.trafficData || []}>
+                  <AreaChart data={overviewStats.trafficData || []}>
                     <defs>
-                      <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorViewsAnalytics" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
                         <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                       </linearGradient>
@@ -219,7 +444,7 @@ export default function ProjectDetail() {
                       stroke="#3B82F6"
                       strokeWidth={3}
                       fillOpacity={1}
-                      fill="url(#colorViews)"
+                      fill="url(#colorViewsAnalytics)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -232,7 +457,7 @@ export default function ProjectDetail() {
               <div className="relative z-10 text-center">
                 <span className="text-blue-400 text-sm font-medium tracking-wider uppercase mb-2 block">Active Visitors Now</span>
                 <div className="text-6xl font-bold text-white mb-4 tracking-tight">
-                  {stats?.realTimeVisitors?.toLocaleString() || 0}
+                  {overviewStats?.realTimeVisitors?.toLocaleString() || 0}
                 </div>
                 <div className="flex gap-1 justify-center">
                   {[...Array(5)].map((_, i) => (
@@ -331,7 +556,9 @@ export default function ProjectDetail() {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'settings' && (
         <div className="space-y-6">
           {/* Settings Tab Content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -425,17 +652,113 @@ export default function ProjectDetail() {
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
-            <p className="text-slate-400 text-sm mb-4">Deleting this project will permanently remove all associated data and analytics.</p>
+      {activeTab === 'profile' && (
+        <div className="space-y-6">
+          {/* Project Information */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
+            <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Target URL</label>
+                <input
+                  type="text"
+                  value={targetUrl}
+                  onChange={(e) => setTargetUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              >
+                <option>(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
+                <option>(GMT+00:00) UTC</option>
+                <option>(GMT-05:00) Eastern Time (US & Canada)</option>
+                <option>(GMT-08:00) Pacific Time (US & Canada)</option>
+              </select>
+            </div>
+
             <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {deleting ? 'Deleting...' : 'Delete Project'}
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Changes
             </button>
+          </div>
+
+          {/* Notification Preferences */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-1">Notification Preferences</h2>
+            <p className="text-sm text-slate-400 mb-6">Stay updated on your website's traffic performance.</p>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-white">Traffic Spikes</h3>
+                  <p className="text-xs text-slate-400">Get an email notification when traffic increases by more than 50% in an hour.</p>
+                </div>
+                <button
+                  onClick={() => setNotifications(prev => ({ ...prev, trafficSpikes: !prev.trafficSpikes }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.trafficSpikes ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.trafficSpikes ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-800 pt-6">
+                <div>
+                  <h3 className="text-sm font-medium text-white">Weekly Digest</h3>
+                  <p className="text-xs text-slate-400">Receive a weekly summary of your top performing pages and visitor growth.</p>
+                </div>
+                <button
+                  onClick={() => setNotifications(prev => ({ ...prev, weeklyDigest: !prev.weeklyDigest }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.weeklyDigest ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.weeklyDigest ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Delete Project */}
+          <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-500/10 rounded-lg">
+                <Trash2 className="h-6 w-6 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
+                <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete This Project'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
