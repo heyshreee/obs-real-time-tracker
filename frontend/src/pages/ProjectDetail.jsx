@@ -3,12 +3,14 @@ import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom
 import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
   Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
-  Users, Clock, TrendingUp, Globe, Bell, Trash2
+  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { apiRequest } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import Modal from '../components/Modal';
@@ -226,13 +228,16 @@ export default function ProjectDetail() {
   );
   if (!project) return <div className="text-red-400">Project not found</div>;
 
-  const trackingUrl = `${API_URL}/track/${project.tracking_id}`;
+  const trackingId = project.tracking_id;
+  const trackingUrl = `${API_URL}/track/${trackingId}`;
   const trackingSnippet = `<script>
 (function() {
+  const TRACKING_ID = "${trackingId}";
+  const TRACKING_URL = "${trackingUrl}";
   const sessionId = localStorage.getItem('visitor_session_id') || 'anon_' + Math.random().toString(36).substr(2, 9);
   localStorage.setItem('visitor_session_id', sessionId);
 
-  fetch("${trackingUrl}", {
+  fetch(TRACKING_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -532,6 +537,24 @@ export default function ProjectDetail() {
         <div className="space-y-6">
           {/* Settings Tab Content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Tracking ID */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Hash className="h-5 w-5 text-green-400" />
+                <h2 className="text-lg font-semibold text-white">Tracking ID</h2>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={trackingId}
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 font-mono text-sm focus:outline-none"
+                />
+                <CopyButton text={trackingId} />
+              </div>
+            </div>
+
+            {/* Tracking URL */}
             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <ExternalLink className="h-5 w-5 text-blue-400" />
@@ -548,13 +571,27 @@ export default function ProjectDetail() {
               </div>
             </div>
 
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            {/* Tracking Snippet */}
+            <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Code className="h-5 w-5 text-purple-400" />
                 <h2 className="text-lg font-semibold text-white">Tracking Snippet</h2>
               </div>
-              <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl font-mono text-sm text-slate-300 overflow-x-auto mb-4">
-                <pre>{trackingSnippet}</pre>
+              <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mb-4">
+                <SyntaxHighlighter
+                  language="html"
+                  style={atomDark}
+                  customStyle={{
+                    background: 'transparent',
+                    padding: '1rem',
+                    margin: 0,
+                    fontSize: '0.875rem',
+                    lineHeight: '1.5',
+                  }}
+                  wrapLongLines={true}
+                >
+                  {trackingSnippet}
+                </SyntaxHighlighter>
               </div>
               <CopyButton text={trackingSnippet} label="Copy Snippet" />
             </div>
@@ -803,16 +840,16 @@ export default function ProjectDetail() {
               <tbody className="text-sm">
                 {pagesData.map((page, i) => (
                   <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 pl-2">
-                      <div className="text-white font-medium truncate max-w-[300px]">{page.title || page.url}</div>
-                      <div className="text-xs text-slate-500 truncate max-w-[300px]">{page.url}</div>
+                    <td className="py-3 pl-2 text-white font-medium truncate max-w-[300px]">
+                      <div className="truncate">{page.title || 'Untitled'}</div>
+                      <div className="text-xs text-slate-500 truncate">{page.url}</div>
                     </td>
                     <td className="py-3 text-right pr-2 text-slate-300">{page.views.toLocaleString()}</td>
                   </tr>
                 ))}
                 {pagesData.length === 0 && (
                   <tr>
-                    <td colSpan="2" className="py-8 text-center text-slate-500">No data available</td>
+                    <td colSpan="2" className="py-8 text-center text-slate-500">No pages found</td>
                   </tr>
                 )}
               </tbody>
@@ -820,6 +857,6 @@ export default function ProjectDetail() {
           )}
         </div>
       </Modal>
-    </div >
+    </div>
   );
 }

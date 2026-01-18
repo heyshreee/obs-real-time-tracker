@@ -285,7 +285,7 @@ export default function Dashboard() {
                     <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    from <span className="text-slate-300">{activity.location}</span> on <span className="text-slate-300">{activity.site}</span>
+                    from <span className="text-slate-300">{activity.title || 'Unknown Page'}</span>, <span className="text-slate-300 capitalize">{activity.device || 'Desktop'}</span> on <span className="text-slate-300">{activity.ip}</span>
                   </p>
                   <p className="text-[10px] text-slate-500 mt-1">
                     {new Date(activity.timestamp).toLocaleTimeString()}

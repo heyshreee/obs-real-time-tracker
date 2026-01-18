@@ -280,15 +280,16 @@ exports.getDashboardStats = async (req, res) => {
 
         // 4. Live Activity (Last 5 events)
         const { data: recentActivity } = await supabase
-            .from('visitors')
-            .select('*')
+            .from('page_views')
+            .select('*, visitors(ip_address, device_type, city, country)')
             .eq('user_id', userId)
-            .order('last_seen', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(5);
 
         const liveActivity = recentActivity?.map(v => {
-            const city = v.city === 'Unknown' ? '' : v.city;
-            const country = v.country === 'Unknown' ? '' : v.country;
+            const visitor = v.visitors || {};
+            const city = visitor.city === 'Unknown' ? '' : visitor.city;
+            const country = visitor.country === 'Unknown' ? '' : visitor.country;
             const location = [city, country].filter(Boolean).join(', ') || 'Unknown Location';
 
             let site = 'Unknown Site';
@@ -305,10 +306,12 @@ exports.getDashboardStats = async (req, res) => {
                 id: v.id,
                 type: 'view',
                 location,
-                ip: v.ip_address,
+                ip: visitor.ip_address,
                 site,
                 path,
-                timestamp: v.last_seen
+                title: v.title,
+                device: visitor.device_type,
+                timestamp: v.created_at
             };
         }) || [];
 

@@ -234,7 +234,7 @@ export default function Projects() {
                 {filteredProjects.map((project) => (
                     <div
                         key={project.id}
-                        onClick={() => navigate(`/projects/${encodeURIComponent(project.name)}`)}
+                        onClick={() => navigate(`/projects/${project.id}`)}
                         className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col cursor-pointer"
                     >
                         <div className="flex justify-between items-start mb-4">
@@ -278,7 +278,8 @@ export default function Projects() {
                                 <span>{stats[project.id]?.total_views?.toLocaleString() || 0} views</span>
                             </div>
                             <Link
-                                to={`/projects/${encodeURIComponent(project.name)}`}
+                                to={`/projects/${project.id}`}
+                                onClick={(e) => e.stopPropagation()}
                                 className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-medium group/link"
                             >
                                 View Analytics
