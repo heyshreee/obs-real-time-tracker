@@ -128,6 +128,10 @@ exports.deleteProject = async (req, res) => {
 
         if (error) throw error;
 
+        // Audit Log
+        const { logAction } = require('../services/audit.service');
+        await logAction(userId, 'PROJECT_DELETE', { projectId });
+
         res.json({ success: true });
     } catch (error) {
         console.error('Delete project error:', error);

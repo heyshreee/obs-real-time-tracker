@@ -54,7 +54,7 @@ export default function Dashboard() {
       loadData(false);
     });
 
-    const interval = setInterval(() => loadData(false), 5000); // 5s polling
+    const interval = setInterval(() => loadData(false), 1000); // 1s polling
 
     return () => {
       clearInterval(interval);
@@ -67,7 +67,7 @@ export default function Dashboard() {
     try {
       const [projectsData, statsData] = await Promise.all([
         apiRequest('/projects'),
-        apiRequest(`/visitors/dashboard-stats?range=${timeRange}`).catch(() => null)
+        apiRequest(`/analytics/overview?range=${timeRange}`).catch(() => null)
       ]);
 
       setProjects(projectsData);
@@ -78,7 +78,7 @@ export default function Dashboard() {
 
       if (projectsData.length > 0) {
         const statsPromises = projectsData.map(p =>
-          apiRequest(`/projects/${p.id}/stats`).catch(() => null)
+          apiRequest(`/analytics/projects/${p.id}/overview`).catch(() => null)
         );
         const allStats = await Promise.all(statsPromises);
 

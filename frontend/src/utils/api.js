@@ -1,4 +1,12 @@
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/$/, '')}/v1`;
+  }
+  return import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1';
+};
+
+const API_URL = getApiUrl();
 
 export async function apiRequest(endpoint, options = {}) {
   // Token is now handled via HttpOnly cookie
@@ -7,6 +15,7 @@ export async function apiRequest(endpoint, options = {}) {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0',
+    'X-Requested-With': 'XMLHttpRequest', // CSRF Protection
     ...options.headers,
   };
 

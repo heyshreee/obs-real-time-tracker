@@ -87,7 +87,7 @@ export default function ProjectDetail() {
       loadStats(project.id, false);
     });
 
-    const interval = setInterval(() => loadStats(project.id, false), 5000);
+    const interval = setInterval(() => loadStats(project.id, false), 1000);
 
     return () => {
       clearInterval(interval);
@@ -99,8 +99,8 @@ export default function ProjectDetail() {
     try {
       const [projectData, statsData, detailedStats] = await Promise.all([
         apiRequest(`/projects/${idOrName}`),
-        apiRequest(`/projects/${idOrName}/stats`),
-        apiRequest(`/projects/${idOrName}/detailed-stats?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`).catch(() => null)
+        apiRequest(`/analytics/projects/${idOrName}/overview`),
+        apiRequest(`/analytics/projects/${idOrName}/traffic?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`).catch(() => null)
       ]);
       setProject(projectData);
       setProjectName(projectData.name);
@@ -125,8 +125,8 @@ export default function ProjectDetail() {
     if (!projectId) return;
     try {
       const [statsData, detailedStats] = await Promise.all([
-        apiRequest(`/projects/${projectId}/stats`),
-        apiRequest(`/projects/${projectId}/detailed-stats?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`)
+        apiRequest(`/analytics/projects/${projectId}/overview`),
+        apiRequest(`/analytics/projects/${projectId}/traffic?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`)
       ]);
       setStats(statsData);
       setOverviewStats(detailedStats);
@@ -199,7 +199,7 @@ export default function ProjectDetail() {
     setShowActivityModal(true);
     setLoadingModalData(true);
     try {
-      const data = await apiRequest(`/projects/${project.id}/activity?limit=100`);
+      const data = await apiRequest(`/analytics/projects/${project.id}/activity?limit=100`);
       setActivityData(data);
     } catch (err) {
       showToast('Failed to load activity', 'error');
@@ -212,7 +212,7 @@ export default function ProjectDetail() {
     setShowPagesModal(true);
     setLoadingModalData(true);
     try {
-      const data = await apiRequest(`/projects/${project.id}/pages?range=${timeRange}`);
+      const data = await apiRequest(`/analytics/projects/${project.id}/pages?range=${timeRange}`);
       setPagesData(data);
     } catch (err) {
       showToast('Failed to load pages', 'error');

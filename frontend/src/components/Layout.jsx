@@ -63,7 +63,10 @@ export default function Layout() {
             }));
         });
 
+        const interval = setInterval(() => loadSidebarData(), 1000);
+
         return () => {
+            clearInterval(interval);
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
@@ -85,7 +88,7 @@ export default function Layout() {
         try {
             const [projects, usage] = await Promise.all([
                 apiRequest('/projects'),
-                apiRequest('/users/usage')
+                apiRequest('/usage')
             ]);
 
             setPinnedProjects(projects.filter(p => p.is_pinned));

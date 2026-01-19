@@ -14,11 +14,13 @@ export default function ProjectActivity() {
 
     useEffect(() => {
         loadData();
+        const interval = setInterval(() => loadData(false), 1000);
+        return () => clearInterval(interval);
     }, [idOrName]);
 
-    const loadData = async () => {
+    const loadData = async (showLoading = true) => {
         try {
-            setLoading(true);
+            if (showLoading) setLoading(true);
             const projectData = await apiRequest(`/projects/${idOrName}`);
             setProject(projectData);
 
@@ -27,7 +29,7 @@ export default function ProjectActivity() {
             // but for now we use the existing one with a high limit.
             // Actually, the controller returns 'recentActivity' inside the stats object.
             // Let's assume we can pass a limit.
-            const stats = await apiRequest(`/projects/${projectData.id}/detailed-stats?limit=100`);
+            const stats = await apiRequest(`/analytics/projects/${projectData.id}/traffic?limit=100`);
             if (stats && stats.recentActivity) {
                 setActivity(stats.recentActivity);
             }

@@ -87,7 +87,7 @@ export default function API() {
                             <CodeBlock
                                 title="cURL"
                                 language="bash"
-                                code={`curl https://api.obstracker.com/v1/stats \\
+                                code={`curl https://api.obstracker.com/api/v1/projects \\
   -H "Authorization: Bearer YOUR_API_KEY"`}
                             />
                         </section>
@@ -122,7 +122,7 @@ export default function API() {
                                             code={`export default async function handler(req, res) {
   // 1. Get your Tracking ID from environment variables
   const TRACKING_ID = process.env.OBS_TRACKING_ID;
-  const API_URL = \`https://api.obstracker.com/track/\${TRACKING_ID}\`;
+  const API_URL = \`https://api.obstracker.com/api/v1/track/\${TRACKING_ID}\`;
 
   // 2. Forward the request to OBS Tracker
   const response = await fetch(API_URL, {
@@ -171,7 +171,7 @@ export default function API() {
                                         code={`<script>
 (function() {
   const TRACKING_ID = "YOUR_TRACKING_ID";
-  const TRACKING_URL = "https://api.obstracker.com/track/" + TRACKING_ID;
+  const TRACKING_URL = "https://api.obstracker.com/api/v1/track/" + TRACKING_ID;
   const sessionId = localStorage.getItem('visitor_session_id') || 'anon_' + Math.random().toString(36).substr(2, 9);
   localStorage.setItem('visitor_session_id', sessionId);
 
@@ -196,9 +196,9 @@ export default function API() {
                             <h2 className="text-2xl font-bold text-white mb-4">Endpoints</h2>
                             <div className="space-y-4">
                                 {[
-                                    { method: 'GET', path: '/v1/projects', desc: 'List all projects' },
-                                    { method: 'GET', path: '/v1/projects/:id/stats', desc: 'Get stats for a specific project' },
-                                    { method: 'POST', path: '/v1/projects', desc: 'Create a new project' },
+                                    { method: 'GET', path: '/api/v1/projects', desc: 'List all projects' },
+                                    { method: 'GET', path: '/api/v1/analytics/projects/:id/overview', desc: 'Get stats for a specific project' },
+                                    { method: 'POST', path: '/api/v1/projects', desc: 'Create a new project' },
                                 ].map((endpoint, i) => (
                                     <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-[#151921] border border-white/5">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${endpoint.method === 'GET' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>

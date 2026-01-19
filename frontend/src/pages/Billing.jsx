@@ -25,7 +25,7 @@ export default function Billing() {
             const projects = await apiRequest('/projects');
             if (projects.length > 0) {
                 const statsPromises = projects.map(p =>
-                    apiRequest(`/projects/${p.id}/stats`).catch(() => null)
+                    apiRequest(`/analytics/projects/${p.id}/overview`).catch(() => null)
                 );
                 const allStats = await Promise.all(statsPromises);
                 const totalViews = allStats.reduce((acc, curr) => acc + (curr?.current_month_views || 0), 0);
@@ -40,7 +40,7 @@ export default function Billing() {
 
     const loadUsage = async () => {
         try {
-            const usage = await apiRequest('/users/usage');
+            const usage = await apiRequest('/usage');
             setUsageStats(usage);
         } catch (err) {
             // Silent fail

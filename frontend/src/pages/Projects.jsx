@@ -27,16 +27,19 @@ export default function Projects() {
 
     useEffect(() => {
         loadProjects();
+        const interval = setInterval(() => loadProjects(false), 1000);
+        return () => clearInterval(interval);
     }, []);
 
-    const loadProjects = async () => {
+    const loadProjects = async (showLoading = true) => {
         try {
+            if (showLoading) setLoading(true);
             const projectsData = await apiRequest('/projects');
             setProjects(projectsData);
 
             if (projectsData.length > 0) {
                 const statsPromises = projectsData.map(p =>
-                    apiRequest(`/projects/${p.id}/stats`).catch(() => null)
+                    apiRequest(`/analytics/projects/${p.id}/overview`).catch(() => null)
                 );
                 const allStats = await Promise.all(statsPromises);
 
@@ -431,22 +434,25 @@ export default function Projects() {
                             type="text"
                             required
                             value={projectName}
+                            onChange={(e) => setProjectName(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="my-portfolio"
                         />
                         <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
                     </div>
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Allowed Origins (Optional)
+                            Allowed Origins
                         </label>
                         <input
                             type="text"
+                            required
                             value={allowedOrigins}
                             onChange={(e) => setAllowedOrigins(e.target.value)}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="https://example.com, http://localhost:3000"
                         />
-                        <p className="text-xs text-slate-500 mt-1">Comma separated list of domains allowed to track. Leave empty to allow all.</p>
+                        <p className="text-xs text-slate-500 mt-1">Comma separated list of domains allowed to track.</p>
                     </div>
                     <div className="flex justify-end gap-2">
                         <button

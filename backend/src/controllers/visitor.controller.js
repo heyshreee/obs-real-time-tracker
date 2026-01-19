@@ -3,26 +3,86 @@ const geoip = require('geoip-lite');
 const UAParser = require('ua-parser-js');
 const { validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
+const { getClientIp } = require('../utils/ip');
+const crypto = require('crypto');
 
-// Simple in-memory cache for deduplication
-const requestCache = new Set();
+// Simple in-memory cache for deduplication (rolling TTL)
+const requestCache = new Map();
+
+/**
+ * Generates a unique hash for a visitor hit to prevent inflation.
+ * Hash = SHA256(IP + UserAgent + ProjectId)
+ */
+const generateHitHash = (ip, ua, projectId) => {
+    return crypto.createHash('sha256')
+        .update(`${ip}-${ua}-${projectId}`)
+        .digest('hex');
+};
+
+/**
+ * Basic bot heuristics based on User-Agent and patterns.
+ */
+const isBot = (ua, req) => {
+    if (!ua) return true;
+    const botPatterns = [
+        'bot', 'crawler', 'spider', 'crawling', 'slurp', 'googlebot',
+        'bingbot', 'yandexbot', 'baiduspider', 'facebookexternalhit',
+        'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview',
+        'showyoubot', 'outbrain', 'pinterest/0.', 'developers.google.com/+/web/snippet',
+        'slackbot', 'vkShare', 'W3C_Validator', 'redditbot', 'Applebot',
+        'WhatsApp', 'flipboard', 'tumblr', 'bitlybot', 'SkypeShell',
+        'Digg', 'bufferbot', 'quora', 'monit', 'Nagios', 'HubSpot',
+        'Pingdom', 'Screaming Frog', 'uptimerobot'
+    ];
+
+    const uaLower = ua.toLowerCase();
+    if (botPatterns.some(pattern => uaLower.includes(pattern.toLowerCase()))) {
+        return true;
+    }
+
+    // Check for headless browsers or missing common headers
+    if (uaLower.includes('headless') || !req.headers['accept-language']) {
+        return true;
+    }
+
+    return false;
+};
 
 exports.trackVisitor = async (req, res) => {
     try {
         const { trackingCode, sessionId, pageUrl, referrer, title } = req.body;
+        const userAgent = req.headers['user-agent'] || '';
 
-        const forwarded = req.headers['x-forwarded-for'];
-        const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
+        // 1. IP Trust Chain
+        const ip = getClientIp(req);
 
-        const dedupeKey = `${trackingCode}-${sessionId || ip}-${pageUrl}`;
-
-        if (requestCache.has(dedupeKey)) {
-            return res.json({ success: true, ignored: true });
+        // 2. Bot Filtering
+        if (isBot(userAgent, req)) {
+            return res.json({ success: true, bot: true });
         }
-        requestCache.add(dedupeKey);
-        setTimeout(() => requestCache.delete(dedupeKey), 2000); // 2 seconds debounce
 
-        // 1. Get project by tracking ID
+        // 3. Tracking Abuse Prevention (Hashing + Rolling TTL)
+        // We use a combination of IP, UA, and Project to identify a unique "hit"
+        // and drop duplicates within a short window (e.g., 30 seconds)
+        const hitHash = generateHitHash(ip, userAgent, trackingCode);
+        const now = Date.now();
+
+        if (requestCache.has(hitHash)) {
+            const lastHit = requestCache.get(hitHash);
+            if (now - lastHit < 30000) { // 30 seconds TTL
+                return res.json({ success: true, ignored: 'DUPLICATE_HIT' });
+            }
+        }
+        requestCache.set(hitHash, now);
+
+        // Cleanup cache periodically (simple version)
+        if (requestCache.size > 10000) {
+            for (const [key, timestamp] of requestCache.entries()) {
+                if (now - timestamp > 60000) requestCache.delete(key);
+            }
+        }
+
+        // 4. Get project by tracking ID
         const { data: project } = await supabase
             .from('projects')
             .select('id, user_id')
@@ -30,21 +90,21 @@ exports.trackVisitor = async (req, res) => {
             .single();
 
         if (!project) {
-            return res.status(404).json({ error: 'Invalid tracking code' });
+            return res.status(404).json({ error: 'INVALID_TRACKING_CODE', message: 'Invalid tracking code' });
         }
 
         // Check limits before proceeding
         const limitCheck = await usageService.checkLimit(project.user_id);
         if (!limitCheck.canTrack) {
             return res.status(403).json({
-                error: 'Limit exceeded',
-                reason: limitCheck.reason,
+                error: 'LIMIT_EXCEEDED',
+                message: limitCheck.reason,
                 usage: limitCheck.usage
             });
         }
 
         const geo = geoip.lookup(ip);
-        const parser = new UAParser(req.headers['user-agent']);
+        const parser = new UAParser(userAgent);
         const uaResult = parser.getResult();
 
         let country = 'Unknown';
@@ -58,7 +118,7 @@ exports.trackVisitor = async (req, res) => {
             city = 'Local Machine';
         }
 
-        // 2. Update Counters (All-time views)
+        // 5. Update Counters (All-time views)
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
             p_id: project.id
         });
@@ -78,7 +138,7 @@ exports.trackVisitor = async (req, res) => {
             }
         }
 
-        // 3. Update Usages (Monthly views)
+        // 6. Update Usages (Monthly views)
         const currentMonth = new Date().toISOString().slice(0, 7);
         const { data: usage } = await supabase
             .from('usages')
@@ -103,13 +163,13 @@ exports.trackVisitor = async (req, res) => {
                 });
         }
 
-        // 4. Keep detailed visitor log
+        // 7. Keep detailed visitor log
         const visitorData = {
             user_id: project.user_id,
             project_id: project.id,
-            session_id: sessionId,
+            session_id: sessionId || hitHash.substring(0, 20), // Fallback to hash if no session
             ip_address: ip,
-            user_agent: req.headers['user-agent'],
+            user_agent: userAgent,
             country: country,
             city: city,
             device_type: uaResult.device.type || 'desktop',
@@ -146,7 +206,7 @@ exports.trackVisitor = async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Track error:', error);
-        res.status(500).json({ error: 'Tracking failed' });
+        res.status(500).json({ error: 'TRACKING_FAILED', message: 'Tracking failed' });
     }
 };
 
@@ -377,16 +437,27 @@ exports.trackVisitorPublic = async (req, res) => {
     try {
         const { trackingId } = req.params;
         const { sessionId, pageUrl, referrer, title } = req.body;
+        const userAgent = req.headers['user-agent'] || '';
 
-        const forwarded = req.headers['x-forwarded-for'];
-        const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
+        // 1. IP Trust Chain
+        const ip = getClientIp(req);
 
-        const dedupeKey = `${trackingId}-${sessionId || ip}-${pageUrl}`;
-        if (requestCache.has(dedupeKey)) {
-            return res.json({ success: true, ignored: true });
+        // 2. Bot Filtering
+        if (isBot(userAgent, req)) {
+            return res.json({ success: true, bot: true });
         }
-        requestCache.add(dedupeKey);
-        setTimeout(() => requestCache.delete(dedupeKey), 2000);
+
+        // 3. Tracking Abuse Prevention (Hashing + Rolling TTL)
+        const hitHash = generateHitHash(ip, userAgent, trackingId);
+        const now = Date.now();
+
+        if (requestCache.has(hitHash)) {
+            const lastHit = requestCache.get(hitHash);
+            if (now - lastHit < 30000) { // 30 seconds TTL
+                return res.json({ success: true, ignored: 'DUPLICATE_HIT' });
+            }
+        }
+        requestCache.set(hitHash, now);
 
         const { data: project } = await supabase
             .from('projects')
@@ -395,17 +466,17 @@ exports.trackVisitorPublic = async (req, res) => {
             .single();
 
         if (!project) {
-            return res.status(404).json({ error: 'Invalid tracking code' });
+            return res.status(404).json({ error: 'INVALID_TRACKING_ID', message: 'Invalid tracking code' });
         }
 
         // Check limits
         const limitCheck = await usageService.checkLimit(project.user_id);
         if (!limitCheck.canTrack) {
-            return res.status(403).json({ error: 'Limit exceeded', reason: limitCheck.reason });
+            return res.status(403).json({ error: 'LIMIT_EXCEEDED', message: limitCheck.reason });
         }
 
         const geo = geoip.lookup(ip);
-        const parser = new UAParser(req.headers['user-agent']);
+        const parser = new UAParser(userAgent);
         const uaResult = parser.getResult();
 
         let country = 'Unknown';
@@ -461,9 +532,9 @@ exports.trackVisitorPublic = async (req, res) => {
         const visitorData = {
             user_id: project.user_id,
             project_id: project.id,
-            session_id: sessionId || 'anon_' + Math.random().toString(36).substr(2, 9),
+            session_id: sessionId || hitHash.substring(0, 20),
             ip_address: ip,
-            user_agent: req.headers['user-agent'],
+            user_agent: userAgent,
             country: country,
             city: city,
             device_type: uaResult.device.type || 'desktop',
@@ -495,35 +566,51 @@ exports.trackVisitorPublic = async (req, res) => {
                 const updatedUsage = await usageService.calculateUsage(project.user_id);
                 global.io.to(`user_${project.user_id}`).emit('usage_update', updatedUsage);
             }
-        }
+            // Fetch updated count to return in response
+            const { data: finalCounter } = await supabase
+                .from('counters')
+                .select('count')
+                .eq('project_id', project.id)
+                .single();
 
-        res.json({ success: true });
+            let returnCount = finalCounter?.count;
+
+            if (returnCount === undefined || returnCount === null) {
+                // Initialize counter if missing (first visit)
+                const { data: newCounter } = await supabase
+                    .from('counters')
+                    .insert({ project_id: project.id, count: 1, updated_at: new Date() })
+                    .select('count')
+                    .single();
+
+                returnCount = newCounter?.count || 1;
+            }
+
+            res.json({
+                success: true,
+                count: returnCount
+            });
+        }
     } catch (error) {
         console.error('Public track error:', error);
-        res.status(500).json({ error: 'Tracking failed' });
+        res.status(500).json({ error: 'TRACKING_FAILED', message: 'Tracking failed' });
     }
 };
 
 exports.getVisitorCountPublic = async (req, res) => {
     try {
         const { trackingId } = req.params;
-        const { data: project } = await supabase
+        const { data: project, error } = await supabase
             .from('projects')
-            .select('id')
+            .select('counters(count)')
             .eq('tracking_id', trackingId)
             .single();
 
-        if (!project) {
+        if (error || !project) {
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        const { data: counter } = await supabase
-            .from('counters')
-            .select('count')
-            .eq('project_id', project.id)
-            .single();
-
-        res.json({ count: counter?.count || 0 });
+        res.json({ count: project.counters?.count || 0 });
     } catch (error) {
         console.error('Get public count error:', error);
         res.status(500).json({ error: 'Failed to fetch count' });

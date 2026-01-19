@@ -2,49 +2,80 @@ const supabase = require('../config/supabase');
 
 const trackingCors = async (req, res, next) => {
     try {
-        const { trackingId } = req.params;
         const origin = req.headers.origin;
+        const { trackingId, id } = req.params;
+        const projectId = trackingId || id;
 
-        // Default CORS headers for all responses
-        res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+        // Dashboard origins (always allowed)
+        const dashboardOrigins = [
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            process.env.FRONTEND_URL
+        ].filter(Boolean).map(o => o.replace(/\/$/, ''));
+
+        // Default CORS headers
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma');
         res.header('Access-Control-Allow-Credentials', 'true');
 
-        // If no origin (server-to-server), allow
-        if (!origin) {
+        // If no origin (server-to-server) or "null" origin, allow
+        if (!origin || origin === 'null') {
             return next();
         }
 
-        // Fetch project allowed origins
-        const { data: project } = await supabase
-            .from('projects')
-            .select('allowed_origins')
-            .eq('tracking_id', trackingId)
-            .single();
+        const requestOrigin = origin.replace(/\/$/, '');
 
-        if (project) {
-            if (project.allowed_origins) {
-                const allowedOrigins = project.allowed_origins.split(',').map(o => o.trim().replace(/\/$/, ''));
-                const requestOrigin = origin.replace(/\/$/, '');
+        // 1. Check if it's a dashboard origin
+        if (dashboardOrigins.includes(requestOrigin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+        }
+        // 2. Check project-specific origins if a project ID is present
+        else if (projectId) {
+            // Determine if projectId is a UUID or a tracking_id
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId);
 
-                if (allowedOrigins.includes(requestOrigin)) {
-                    res.header('Access-Control-Allow-Origin', origin);
-                } else {
-                    console.log(`[CORS] Blocked Origin: ${origin} for ${trackingId}`);
-                    // We don't set Access-Control-Allow-Origin, which blocks it in browser
-                    // For strictness, we can return 403, but for preflight we usually just don't send the header
-                    if (req.method !== 'OPTIONS') {
-                        return res.status(403).json({ error: 'CORS policy: Origin not allowed' });
+            let query = supabase
+                .from('projects')
+                .select('allowed_origins');
+
+            if (isUUID) {
+                query = query.eq('id', projectId);
+            } else {
+                query = query.eq('tracking_id', projectId);
+            }
+
+            const { data: project, error: dbError } = await query.single();
+
+            if (dbError && dbError.code !== 'PGRST116') {
+                console.error('[CORS] Supabase error:', dbError);
+            }
+
+            if (project) {
+                if (project.allowed_origins) {
+                    const allowedOrigins = project.allowed_origins.split(',').map(o => o.trim().replace(/\/$/, ''));
+
+                    if (allowedOrigins.includes(requestOrigin)) {
+                        res.header('Access-Control-Allow-Origin', origin);
+                    } else {
+                        console.log(`[CORS] Blocked: Origin ${origin} not in allowed list for project ${projectId}`);
+                        // Explicitly block if origins are set but don't match
+                        if (req.method !== 'OPTIONS') {
+                            return res.status(403).json({
+                                error: 'CORS_BLOCKED',
+                                message: 'Origin not allowed in project settings'
+                            });
+                        }
                     }
+                } else {
+                    // No specific origins set -> Allow All (SaaS default for tracking)
+                    res.header('Access-Control-Allow-Origin', origin);
                 }
             } else {
-                // No specific origins set -> Allow All
-                res.header('Access-Control-Allow-Origin', origin); // Reflect origin or '*'
+                console.log(`[CORS] Project not found for ID: ${projectId}`);
             }
-        } else {
-            // Project not found - let the controller handle 404, but allow CORS so client sees the error
-            res.header('Access-Control-Allow-Origin', '*');
         }
+        // If not dashboard and not a valid project origin, we don't set the header.
+        // The browser will block the request automatically.
 
         // Handle Preflight
         if (req.method === 'OPTIONS') {
@@ -53,9 +84,7 @@ const trackingCors = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Tracking CORS Error:', error);
-        // Fail open or closed? Closed is safer, but let's try to allow to not break everything on DB error
-        // But for now, let's just pass to next() and let controller handle if DB is down
+        console.error('CORS Middleware Error:', error);
         next();
     }
 };
