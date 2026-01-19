@@ -85,6 +85,8 @@ export default function Dashboard() {
         const projectStats = projectsData.map((p, i) => ({
           ...p,
           views: allStats[i]?.current_month_views || 0,
+          sessions: allStats[i]?.sessionCount || 0,
+          storageUsed: allStats[i]?.storageUsed || 0,
         }));
 
         projectStats.sort((a, b) => b.views - a.views);

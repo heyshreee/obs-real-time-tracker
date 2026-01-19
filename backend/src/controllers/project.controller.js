@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const { v4: uuidv4, validate: uuidValidate } = require('uuid');
+const usageService = require('../services/usage.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -231,9 +232,13 @@ exports.getProjectStats = async (req, res) => {
             .eq('month', currentMonth)
             .single();
 
+        // Get granular storage and session stats
+        const projectUsage = await usageService.calculateProjectUsage(projectId);
+
         res.json({
             total_views: counter?.count || 0,
-            current_month_views: usage?.views || 0
+            current_month_views: usage?.views || 0,
+            ...projectUsage
         });
     } catch (error) {
         console.error('Get project stats error:', error);
@@ -294,19 +299,33 @@ exports.getProjectActivity = async (req, res) => {
         const userId = req.user.id;
         const limit = parseInt(req.query.limit) || 50;
 
-        const { data: project } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        let projectId = id;
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
 
-        if (!project) return res.status(404).json({ error: 'Project not found' });
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        } else {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('id', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        }
 
         const { data: activity } = await supabase
             .from('visitors')
             .select('*')
-            .eq('project_id', project.id)
+            .eq('project_id', projectId)
             .order('last_seen', { ascending: false })
             .limit(limit);
 
@@ -350,14 +369,28 @@ exports.getProjectPages = async (req, res) => {
         const userId = req.user.id;
         const range = req.query.range || '30d';
 
-        const { data: project } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        let projectId = id;
+        if (!uuidValidate(id)) {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('name', id)
+                .eq('user_id', userId)
+                .single();
 
-        if (!project) return res.status(404).json({ error: 'Project not found' });
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        } else {
+            const { data: project } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('id', id)
+                .eq('user_id', userId)
+                .single();
+
+            if (!project) return res.status(404).json({ error: 'Project not found' });
+            projectId = project.id;
+        }
 
         let startDate = new Date();
         if (range === '24h') startDate.setHours(startDate.getHours() - 24);
@@ -368,7 +401,7 @@ exports.getProjectPages = async (req, res) => {
         const { data: pages } = await supabase
             .from('page_views')
             .select('page_url, title')
-            .eq('project_id', project.id)
+            .eq('project_id', projectId)
             .gte('created_at', startDateStr);
 
         const pageMap = {};

@@ -4,7 +4,7 @@ import { ExternalLink, Calendar, BarChart2 } from 'lucide-react';
 export default function ProjectCard({ project }) {
   return (
     <Link
-      to={`/projects/${project._id}`}
+      to={`/projects/${encodeURIComponent(project.name)}`}
       className="group block p-6 bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10 transition-all"
     >
       <div className="flex justify-between items-start mb-4">

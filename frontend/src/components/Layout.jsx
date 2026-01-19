@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -17,21 +17,58 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
+import { io } from 'socket.io-client';
+
+const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
 
 export default function Layout() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pinnedProjects, setPinnedProjects] = useState([]);
-    const [usageStats, setUsageStats] = useState({ totalViews: 0, monthlyLimit: 10000, plan: 'free' });
+    const [usageStats, setUsageStats] = useState({
+        totalViews: 0,
+        monthlyLimit: 10000,
+        storageUsed: 0,
+        storageLimit: 1024 * 1024 * 1024,
+        plan: 'free'
+    });
     const location = useLocation();
     const navigate = useNavigate();
     const { showToast } = useToast();
 
+    const socketRef = useRef(null);
+
     useEffect(() => {
         loadUser();
         loadSidebarData();
-    }, []);
+
+        // Socket connection
+        socketRef.current = io(API_URL, {
+            withCredentials: true
+        });
+
+        socketRef.current.on('connect', () => {
+            if (user) {
+                socketRef.current.emit('join', `user_${user.id}`);
+            }
+        });
+
+        socketRef.current.on('usage_update', (data) => {
+            setUsageStats(prev => ({
+                ...prev,
+                totalViews: data.totalViews,
+                storageUsed: data.storageUsed,
+                storageLimit: data.storageLimit
+            }));
+        });
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+        };
+    }, [user?.id]);
 
     const loadUser = async () => {
         try {
@@ -171,6 +208,28 @@ export default function Layout() {
                         <div className="flex justify-between items-center text-[10px] text-slate-500 mb-3">
                             <span>{usageStats.totalViews.toLocaleString()} / {usageStats.monthlyLimit.toLocaleString()} <span className="hidden sm:inline">limit</span></span>
                         </div>
+
+                        {/* Storage Usage */}
+                        <div className="mb-3 pt-3 border-t border-slate-700/30">
+                            <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase">Storage Used ({usageStats.plan})</span>
+                                <span className="text-[10px] font-bold text-white">
+                                    {usageStats.storageUsed < 1024 * 1024
+                                        ? `${(usageStats.storageUsed / 1024).toFixed(1)} KB`
+                                        : usageStats.storageUsed < 1024 * 1024 * 1024
+                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                            : `${(usageStats.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                                    }
+                                </span>
+                            </div>
+                            <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-green-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.min((usageStats.storageUsed / usageStats.storageLimit) * 100, 100)}%` }}
+                                ></div>
+                            </div>
+                        </div>
+
                         <Link to="/billing" className="block w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20 text-center">
                             Upgrade Plan
                         </Link>

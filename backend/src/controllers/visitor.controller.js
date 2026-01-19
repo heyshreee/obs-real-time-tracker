@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const geoip = require('geoip-lite');
 const UAParser = require('ua-parser-js');
 const { validate: uuidValidate } = require('uuid');
+const usageService = require('../services/usage.service');
 
 // Simple in-memory cache for deduplication
 const requestCache = new Set();
@@ -10,12 +11,6 @@ exports.trackVisitor = async (req, res) => {
     try {
         const { trackingCode, sessionId, pageUrl, referrer, title } = req.body;
 
-        // Deduplication check
-        // Use a combination of trackingCode, sessionId (if available), and pageUrl
-        // If sessionId is missing, we might rely on IP, but let's assume client sends something or we generate it later.
-        // Ideally, we generate sessionId first if missing, but for dedupe we need it now.
-        // If sessionId is missing, we can't effectively dedupe without IP.
-        // Prioritize X-Forwarded-For for proxies (Vercel, Nginx, etc.)
         const forwarded = req.headers['x-forwarded-for'];
         const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
 
@@ -27,7 +22,7 @@ exports.trackVisitor = async (req, res) => {
         requestCache.add(dedupeKey);
         setTimeout(() => requestCache.delete(dedupeKey), 2000); // 2 seconds debounce
 
-        // 1. Get project by tracking ID (was trackingCode)
+        // 1. Get project by tracking ID
         const { data: project } = await supabase
             .from('projects')
             .select('id, user_id')
@@ -36,6 +31,16 @@ exports.trackVisitor = async (req, res) => {
 
         if (!project) {
             return res.status(404).json({ error: 'Invalid tracking code' });
+        }
+
+        // Check limits before proceeding
+        const limitCheck = await usageService.checkLimit(project.user_id);
+        if (!limitCheck.canTrack) {
+            return res.status(403).json({
+                error: 'Limit exceeded',
+                reason: limitCheck.reason,
+                usage: limitCheck.usage
+            });
         }
 
         const geo = geoip.lookup(ip);
@@ -51,10 +56,6 @@ exports.trackVisitor = async (req, res) => {
         } else if (ip === '::1' || ip === '127.0.0.1' || ip.includes('127.0.0.1')) {
             country = 'Localhost';
             city = 'Local Machine';
-        } else {
-            // Try to handle cases where geoip fails but it's not localhost
-            // We can leave it as Unknown or try another lookup if available
-            // For now, 'Unknown' is better than 'Localhost' for public IPs
         }
 
         // 2. Update Counters (All-time views)
@@ -63,7 +64,6 @@ exports.trackVisitor = async (req, res) => {
         });
 
         if (counterError) {
-            // Fallback to manual update if RPC doesn't exist
             const { data: counter } = await supabase
                 .from('counters')
                 .select('count')
@@ -79,7 +79,7 @@ exports.trackVisitor = async (req, res) => {
         }
 
         // 3. Update Usages (Monthly views)
-        const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+        const currentMonth = new Date().toISOString().slice(0, 7);
         const { data: usage } = await supabase
             .from('usages')
             .select('views')
@@ -128,19 +128,18 @@ exports.trackVisitor = async (req, res) => {
             .single();
 
         if (!visitorError) {
-            // Record page view
             await supabase.from('page_views').insert({
                 visitor_id: visitor.id,
-                user_id: project.user_id,
                 user_id: project.user_id,
                 project_id: project.id,
                 page_url: pageUrl,
                 title: title || 'Unknown Page'
             });
 
-            // Emit to socket
             if (global.io) {
                 global.io.to(`user_${project.user_id}`).emit('visitor_update', { ...visitor, project_id: project.id });
+                const updatedUsage = await usageService.calculateUsage(project.user_id);
+                global.io.to(`user_${project.user_id}`).emit('usage_update', updatedUsage);
             }
         }
 
@@ -176,7 +175,6 @@ exports.getDashboardStats = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // 1. Real-time Visitors (Last 5 mins)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { count: realTimeVisitors } = await supabase
             .from('visitors')
@@ -185,21 +183,15 @@ exports.getDashboardStats = async (req, res) => {
             .eq('is_active', true)
             .gte('last_seen', fiveMinutesAgo);
 
-        // 2. Traffic Trends
         const range = req.query.range || '30d';
         let startDate = new Date();
-        let groupBy = 'day'; // 'day' or 'hour'
 
         if (range === '24h') {
             startDate.setHours(startDate.getHours() - 24);
-            groupBy = 'hour';
         } else if (range === '7d') {
             startDate.setDate(startDate.getDate() - 6);
-            groupBy = 'day';
         } else {
-            // 30d default
             startDate.setDate(startDate.getDate() - 29);
-            groupBy = 'day';
         }
         const startDateStr = startDate.toISOString();
 
@@ -212,17 +204,13 @@ exports.getDashboardStats = async (req, res) => {
         const trafficMap = {};
 
         if (range === '24h') {
-            // Initialize last 24 hours
             for (let i = 23; i >= 0; i--) {
                 const d = new Date();
                 d.setHours(d.getHours() - i);
-                const hourStr = d.toISOString().slice(0, 13) + ':00:00.000Z'; // YYYY-MM-DDTHH:00...
-                // Use local time label for map key to match view logic or keep ISO for sorting?
-                // Let's use ISO key for sorting, format later
+                const hourStr = d.toISOString().slice(0, 13) + ':00:00.000Z';
                 trafficMap[hourStr] = 0;
             }
         } else {
-            // Initialize days
             const days = range === '7d' ? 6 : 29;
             for (let i = days; i >= 0; i--) {
                 const d = new Date();
@@ -235,12 +223,10 @@ exports.getDashboardStats = async (req, res) => {
         dailyViews?.forEach(v => {
             let key;
             if (range === '24h') {
-                // Round down to hour
                 key = v.created_at.slice(0, 13) + ':00:00.000Z';
             } else {
                 key = v.created_at.split('T')[0];
             }
-
             if (trafficMap[key] !== undefined) {
                 trafficMap[key]++;
             }
@@ -253,14 +239,9 @@ exports.getDashboardStats = async (req, res) => {
             } else {
                 name = new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             }
-            return {
-                name,
-                views: trafficMap[key],
-                fullDate: key
-            };
+            return { name, views: trafficMap[key], fullDate: key };
         });
 
-        // 3. Top Referral Sources
         const { data: sources } = await supabase
             .from('visitors')
             .select('referrer')
@@ -278,7 +259,6 @@ exports.getDashboardStats = async (req, res) => {
             .slice(0, 5)
             .map((s, i) => ({ ...s, color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i] || '#CBD5E1' }));
 
-        // 4. Live Activity (Last 5 events)
         const { data: recentActivity } = await supabase
             .from('page_views')
             .select('*, visitors(ip_address, device_type, city, country)')
@@ -315,7 +295,6 @@ exports.getDashboardStats = async (req, res) => {
             };
         }) || [];
 
-        // 5. Sparkline (Visits per minute for last 30 mins)
         const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         const { data: recentViews } = await supabase
             .from('page_views')
@@ -324,7 +303,6 @@ exports.getDashboardStats = async (req, res) => {
             .gte('created_at', thirtyMinutesAgo);
 
         const sparklineMap = {};
-        // Initialize last 30 mins
         for (let i = 29; i >= 0; i--) {
             const d = new Date();
             d.setMinutes(d.getMinutes() - i);
@@ -339,12 +317,8 @@ exports.getDashboardStats = async (req, res) => {
             }
         });
 
-        const sparkline = Object.keys(sparklineMap).map(key => ({
-            name: key,
-            value: sparklineMap[key]
-        }));
+        const sparkline = Object.keys(sparklineMap).map(key => ({ name: key, value: sparklineMap[key] }));
 
-        // 6. Device Breakdown
         const { data: devices } = await supabase
             .from('visitors')
             .select('device_type')
@@ -362,7 +336,6 @@ exports.getDashboardStats = async (req, res) => {
             color: key === 'desktop' ? '#3B82F6' : key === 'mobile' ? '#10B981' : '#F59E0B'
         }));
 
-        // 7. Top Pages
         const { data: pages } = await supabase
             .from('page_views')
             .select('page_url')
@@ -408,13 +381,12 @@ exports.trackVisitorPublic = async (req, res) => {
         const forwarded = req.headers['x-forwarded-for'];
         const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.connection.remoteAddress);
 
-        // Deduplication check
         const dedupeKey = `${trackingId}-${sessionId || ip}-${pageUrl}`;
         if (requestCache.has(dedupeKey)) {
             return res.json({ success: true, ignored: true });
         }
         requestCache.add(dedupeKey);
-        setTimeout(() => requestCache.delete(dedupeKey), 2000); // 2 seconds debounce
+        setTimeout(() => requestCache.delete(dedupeKey), 2000);
 
         const { data: project } = await supabase
             .from('projects')
@@ -426,7 +398,11 @@ exports.trackVisitorPublic = async (req, res) => {
             return res.status(404).json({ error: 'Invalid tracking code' });
         }
 
-
+        // Check limits
+        const limitCheck = await usageService.checkLimit(project.user_id);
+        if (!limitCheck.canTrack) {
+            return res.status(403).json({ error: 'Limit exceeded', reason: limitCheck.reason });
+        }
 
         const geo = geoip.lookup(ip);
         const parser = new UAParser(req.headers['user-agent']);
@@ -443,7 +419,6 @@ exports.trackVisitorPublic = async (req, res) => {
             city = 'Local Machine';
         }
 
-        // Update Counters
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
             p_id: project.id
         });
@@ -463,7 +438,6 @@ exports.trackVisitorPublic = async (req, res) => {
             }
         }
 
-        // Update Usages
         const currentMonth = new Date().toISOString().slice(0, 7);
         const { data: usage } = await supabase
             .from('usages')
@@ -481,18 +455,13 @@ exports.trackVisitorPublic = async (req, res) => {
         } else {
             await supabase
                 .from('usages')
-                .insert({
-                    project_id: project.id,
-                    month: currentMonth,
-                    views: 1
-                });
+                .insert({ project_id: project.id, month: currentMonth, views: 1 });
         }
 
-        // Record detailed visitor log
         const visitorData = {
             user_id: project.user_id,
             project_id: project.id,
-            session_id: sessionId || 'anon_' + Math.random().toString(36).substr(2, 9), // Fallback if no session
+            session_id: sessionId || 'anon_' + Math.random().toString(36).substr(2, 9),
             ip_address: ip,
             user_agent: req.headers['user-agent'],
             country: country,
@@ -516,7 +485,6 @@ exports.trackVisitorPublic = async (req, res) => {
             await supabase.from('page_views').insert({
                 visitor_id: visitor.id,
                 user_id: project.user_id,
-                user_id: project.user_id,
                 project_id: project.id,
                 page_url: pageUrl,
                 title: title || 'Unknown Page'
@@ -524,6 +492,8 @@ exports.trackVisitorPublic = async (req, res) => {
 
             if (global.io) {
                 global.io.to(`user_${project.user_id}`).emit('visitor_update', { ...visitor, project_id: project.id });
+                const updatedUsage = await usageService.calculateUsage(project.user_id);
+                global.io.to(`user_${project.user_id}`).emit('usage_update', updatedUsage);
             }
         }
 
@@ -537,18 +507,15 @@ exports.trackVisitorPublic = async (req, res) => {
 exports.getVisitorCountPublic = async (req, res) => {
     try {
         const { trackingId } = req.params;
-
         const { data: project } = await supabase
             .from('projects')
-            .select('id, allowed_origins')
+            .select('id')
             .eq('tracking_id', trackingId)
             .single();
 
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
         }
-
-
 
         const { data: counter } = await supabase
             .from('counters')
@@ -565,14 +532,12 @@ exports.getVisitorCountPublic = async (req, res) => {
 
 exports.getProjectDetailedStats = async (req, res) => {
     try {
-        const { id } = req.params; // Project ID
+        const { id } = req.params;
         const userId = req.user.id;
 
-        // Verify project ownership
-        // Verify project ownership
         let query = supabase
             .from('projects')
-            .select('id, tracking_id, allowed_origins')
+            .select('id, tracking_id')
             .eq('user_id', userId);
 
         if (uuidValidate(id)) {
@@ -587,7 +552,6 @@ exports.getProjectDetailedStats = async (req, res) => {
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        // 1. Real-time Visitors (Last 5 mins)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const { count: realTimeVisitors } = await supabase
             .from('visitors')
@@ -596,39 +560,20 @@ exports.getProjectDetailedStats = async (req, res) => {
             .eq('is_active', true)
             .gte('last_seen', fiveMinutesAgo);
 
-        // 2. Traffic Trends
         const range = req.query.range || '7d';
         let timezone = req.query.timezone || 'UTC';
-
-        // Normalize timezone
         const tzMap = {
             '(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi': 'Asia/Kolkata',
             '(GMT+00:00) UTC': 'UTC',
             '(GMT-05:00) Eastern Time (US & Canada)': 'America/New_York',
             '(GMT-08:00) Pacific Time (US & Canada)': 'America/Los_Angeles'
         };
-        if (tzMap[timezone]) {
-            timezone = tzMap[timezone];
-        }
-
-        // Validate timezone
-        try {
-            new Intl.DateTimeFormat('en-US', { timeZone: timezone });
-        } catch (e) {
-            console.warn(`Invalid timezone: ${timezone}, falling back to UTC`);
-            timezone = 'UTC';
-        }
+        if (tzMap[timezone]) timezone = tzMap[timezone];
 
         let startDate = new Date();
-
-        if (range === '24h') {
-            startDate.setHours(startDate.getHours() - 24);
-        } else if (range === '30d') {
-            startDate.setDate(startDate.getDate() - 29);
-        } else {
-            // 7d default
-            startDate.setDate(startDate.getDate() - 6);
-        }
+        if (range === '24h') startDate.setHours(startDate.getHours() - 24);
+        else if (range === '30d') startDate.setDate(startDate.getDate() - 29);
+        else startDate.setDate(startDate.getDate() - 6);
         const startDateStr = startDate.toISOString();
 
         const { data: dailyViews } = await supabase
@@ -638,22 +583,12 @@ exports.getProjectDetailedStats = async (req, res) => {
             .gte('created_at', startDateStr);
 
         const trafficMap = {};
-
-        // Helper to format date in target timezone
-        const formatInTimezone = (date, options) => {
-            return new Date(date).toLocaleString('en-US', { ...options, timeZone: timezone });
-        };
-
         if (range === '24h') {
             for (let i = 23; i >= 0; i--) {
                 const d = new Date();
                 d.setHours(d.getHours() - i);
-                // Key format: "YYYY-MM-DD HH:00" in target timezone
                 const dateInTz = new Date(d.toLocaleString('en-US', { timeZone: timezone }));
-                const key = dateInTz.getFullYear() + '-' +
-                    String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(dateInTz.getDate()).padStart(2, '0') + ' ' +
-                    String(dateInTz.getHours()).padStart(2, '0') + ':00';
+                const key = dateInTz.getFullYear() + '-' + String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' + String(dateInTz.getDate()).padStart(2, '0') + ' ' + String(dateInTz.getHours()).padStart(2, '0') + ':00';
                 trafficMap[key] = 0;
             }
         } else {
@@ -661,99 +596,44 @@ exports.getProjectDetailedStats = async (req, res) => {
             for (let i = days; i >= 0; i--) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
-                // Key format: "YYYY-MM-DD" in target timezone
                 const dateInTz = new Date(d.toLocaleString('en-US', { timeZone: timezone }));
-                const key = dateInTz.getFullYear() + '-' +
-                    String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(dateInTz.getDate()).padStart(2, '0');
+                const key = dateInTz.getFullYear() + '-' + String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' + String(dateInTz.getDate()).padStart(2, '0');
                 trafficMap[key] = 0;
             }
         }
 
         dailyViews?.forEach(v => {
-            let key;
             const dateInTz = new Date(new Date(v.created_at).toLocaleString('en-US', { timeZone: timezone }));
-
-            if (range === '24h') {
-                key = dateInTz.getFullYear() + '-' +
-                    String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(dateInTz.getDate()).padStart(2, '0') + ' ' +
-                    String(dateInTz.getHours()).padStart(2, '0') + ':00';
-            } else {
-                key = dateInTz.getFullYear() + '-' +
-                    String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(dateInTz.getDate()).padStart(2, '0');
-            }
-
-            if (trafficMap[key] !== undefined) {
-                trafficMap[key]++;
-            }
+            let key = range === '24h'
+                ? dateInTz.getFullYear() + '-' + String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' + String(dateInTz.getDate()).padStart(2, '0') + ' ' + String(dateInTz.getHours()).padStart(2, '0') + ':00'
+                : dateInTz.getFullYear() + '-' + String(dateInTz.getMonth() + 1).padStart(2, '0') + '-' + String(dateInTz.getDate()).padStart(2, '0');
+            if (trafficMap[key] !== undefined) trafficMap[key]++;
         });
 
         const trafficData = Object.keys(trafficMap).map(key => {
-            let name;
-            // Parse the key back to a date object for formatting (assuming key is local time in target timezone)
-            // We append a dummy time/offset to make it parseable, but we only need the components
             const [datePart, timePart] = key.split(' ');
             const [year, month, day] = datePart.split('-').map(Number);
             const hour = timePart ? parseInt(timePart.split(':')[0]) : 0;
-
-            // Create a date object representing this local time
             const localDate = new Date(year, month - 1, day, hour);
-
-            if (range === '24h') {
-                name = localDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            } else if (range === '30d') {
-                name = localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            } else {
-                name = localDate.toLocaleDateString('en-US', { weekday: 'short' });
-            }
-            return {
-                name,
-                views: trafficMap[key],
-                fullDate: key // This is now the local date string, which sorts correctly alphabetically
-            };
+            let name = range === '24h' ? localDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : range === '30d' ? localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : localDate.toLocaleDateString('en-US', { weekday: 'short' });
+            return { name, views: trafficMap[key], fullDate: key };
         }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
 
-        // 3. Recent Activity
-        const limit = parseInt(req.query.limit) || 5;
         const { data: recentActivity } = await supabase
             .from('page_views')
             .select('*, visitors(ip_address, device_type, city, country)')
             .eq('project_id', project.id)
             .order('created_at', { ascending: false })
-            .limit(limit);
+            .limit(parseInt(req.query.limit) || 5);
 
         const activityList = recentActivity?.map(v => {
             const visitor = v.visitors || {};
-            const city = visitor.city === 'Unknown' ? '' : visitor.city;
-            const country = visitor.country === 'Unknown' ? '' : visitor.country;
-            const location = [city, country].filter(Boolean).join(', ') || 'Unknown Location';
-
-            let site = 'Unknown Site';
+            const location = [visitor.city, visitor.country].filter(c => c && c !== 'Unknown').join(', ') || 'Unknown Location';
             let path = '/';
-            try {
-                const url = new URL(v.page_url);
-                site = url.hostname;
-                path = url.pathname;
-            } catch (e) {
-                site = v.page_url || 'Unknown';
-            }
-
-            return {
-                id: v.id,
-                type: 'view',
-                location,
-                ip: visitor.ip_address,
-                site,
-                path,
-                title: v.title,
-                timestamp: v.created_at,
-                device: visitor.device_type
-            };
+            try { path = new URL(v.page_url).pathname; } catch (e) { path = v.page_url || '/'; }
+            return { id: v.id, type: 'view', location, ip: visitor.ip_address, path, title: v.title, timestamp: v.created_at, device: visitor.device_type };
         }) || [];
 
-        // 4. Top Referrers
         const { data: sources } = await supabase
             .from('visitors')
             .select('referrer')
@@ -763,13 +643,7 @@ exports.getProjectDetailedStats = async (req, res) => {
         const sourceMap = {};
         sources?.forEach(s => {
             let ref = 'Direct';
-            if (s.referrer) {
-                try {
-                    ref = new URL(s.referrer).hostname;
-                } catch (e) {
-                    ref = s.referrer;
-                }
-            }
+            if (s.referrer) try { ref = new URL(s.referrer).hostname; } catch (e) { ref = s.referrer; }
             sourceMap[ref] = (sourceMap[ref] || 0) + 1;
         });
 
@@ -779,14 +653,12 @@ exports.getProjectDetailedStats = async (req, res) => {
             .slice(0, 5)
             .map((s, i) => ({ ...s, color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i] || '#CBD5E1' }));
 
-        // 5. Unique Visitors (Total for range)
         const { count: uniqueVisitors } = await supabase
             .from('visitors')
             .select('*', { count: 'exact', head: true })
             .eq('project_id', project.id)
             .gte('last_seen', startDateStr);
 
-        // 6. Device Breakdown
         const { data: devices } = await supabase
             .from('visitors')
             .select('device_type')
@@ -805,7 +677,6 @@ exports.getProjectDetailedStats = async (req, res) => {
             color: key === 'desktop' ? '#3B82F6' : key === 'mobile' ? '#10B981' : '#F59E0B'
         }));
 
-        // 7. Top Pages
         const { data: pages } = await supabase
             .from('page_views')
             .select('page_url, title')
@@ -815,24 +686,13 @@ exports.getProjectDetailedStats = async (req, res) => {
         const pageMap = {};
         pages?.forEach(p => {
             try {
-                const url = new URL(p.page_url);
-                const path = url.pathname;
-                const key = path; // Use path as key for aggregation
-
-                if (!pageMap[key]) {
-                    pageMap[key] = { views: 0, title: p.title || path };
-                }
-                pageMap[key].views++;
-                // Update title if we have a better one (not Unknown Page)
-                if (p.title && p.title !== 'Unknown Page') {
-                    pageMap[key].title = p.title;
-                }
+                const path = new URL(p.page_url).pathname;
+                if (!pageMap[path]) pageMap[path] = { views: 0, title: p.title || path };
+                pageMap[path].views++;
+                if (p.title && p.title !== 'Unknown Page') pageMap[path].title = p.title;
             } catch (e) {
-                const key = p.page_url;
-                if (!pageMap[key]) {
-                    pageMap[key] = { views: 0, title: p.title || key };
-                }
-                pageMap[key].views++;
+                if (!pageMap[p.page_url]) pageMap[p.page_url] = { views: 0, title: p.title || p.page_url };
+                pageMap[p.page_url].views++;
             }
         });
 
@@ -840,9 +700,6 @@ exports.getProjectDetailedStats = async (req, res) => {
             .map(([url, data]) => ({ url, views: data.views, title: data.title }))
             .sort((a, b) => b.views - a.views)
             .slice(0, 5);
-
-        // 6. Avg Session Duration (Mocked for now)
-        const avgSessionDuration = "2m 45s";
 
         res.json({
             realTimeVisitors: realTimeVisitors || 0,
@@ -852,7 +709,7 @@ exports.getProjectDetailedStats = async (req, res) => {
             uniqueVisitors: uniqueVisitors || 0,
             deviceStats,
             topPages,
-            avgSessionDuration
+            avgSessionDuration: "2m 45s"
         });
 
     } catch (error) {
@@ -860,5 +717,3 @@ exports.getProjectDetailedStats = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch project stats' });
     }
 };
-
-

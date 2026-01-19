@@ -13,8 +13,6 @@ export default function Legal({ type }) {
                     <p>We collect information you provide directly to us, such as when you create an account, subscribe to our newsletter, or contact customer support.</p>
                     <h3>2. How We Use Your Information</h3>
                     <p>We use the information we collect to provide, maintain, and improve our services, to develop new ones, and to protect OBS Tracker and our users.</p>
-                    <h3>3. Data Retention</h3>
-                    <p>We retain your personal information for as long as necessary to provide the services you have requested, or for other essential purposes such as complying with our legal obligations.</p>
                 </>
             )
         },

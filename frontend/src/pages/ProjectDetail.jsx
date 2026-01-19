@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom
 import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
   Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
-  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash
+  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -323,12 +323,21 @@ export default function ProjectDetail() {
             </div>
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-slate-400">Avg. Session Duration</h3>
-                <Clock className="h-5 w-5 text-orange-500" />
+                <h3 className="text-sm font-medium text-slate-400">Storage Used</h3>
+                <Database className="h-5 w-5 text-green-500" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">{overviewStats.avgSessionDuration}</span>
-                <span className="text-xs font-medium text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">-3%</span>
+                <span className="text-3xl font-bold text-white">
+                  {stats?.storageUsed < 1024 * 1024
+                    ? `${(stats?.storageUsed / 1024).toFixed(1)} KB`
+                    : stats?.storageUsed < 1024 * 1024 * 1024
+                      ? `${(stats?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                      : `${(stats?.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                  }
+                </span>
+                <span className="text-xs font-medium text-slate-500">
+                  {stats?.storageBreakdown?.visitors < 1024 * 1024 ? `${(stats?.storageBreakdown?.visitors / 1024).toFixed(0)}K` : `${(stats?.storageBreakdown?.visitors / (1024 * 1024)).toFixed(1)}M`} V / {stats?.storageBreakdown?.pageViews < 1024 * 1024 ? `${(stats?.storageBreakdown?.pageViews / 1024).toFixed(0)}K` : `${(stats?.storageBreakdown?.pageViews / (1024 * 1024)).toFixed(1)}M`} P
+                </span>
               </div>
             </div>
           </div>

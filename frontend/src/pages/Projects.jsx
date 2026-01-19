@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
+import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 import {
     Plus, ExternalLink, BarChart2, Trash2, Loader2, Pin,
     Search, Grid, List, MoreVertical, Folder, Zap, Database,
-    Layout, ArrowRight, Eye
+    Layout, ArrowRight, Eye, Users
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
@@ -18,7 +18,11 @@ export default function Projects() {
     const [projectName, setProjectName] = useState('');
     const [allowedOrigins, setAllowedOrigins] = useState('');
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState('grid');
+    const [creating, setCreating] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const navigate = useNavigate();
     const { showToast } = useToast();
 
     useEffect(() => {
@@ -49,7 +53,6 @@ export default function Projects() {
         }
     };
 
-    const [creating, setCreating] = useState(false);
 
     const handleCreateProject = async (e) => {
         e.preventDefault();
@@ -79,7 +82,6 @@ export default function Projects() {
         }
     };
 
-    const [deletingId, setDeletingId] = useState(null);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this project?')) return;
@@ -121,6 +123,7 @@ export default function Projects() {
     // Calculate total monthly views across all projects
     const totalMonthlyViews = Object.values(stats).reduce((acc, curr) => acc + (curr?.current_month_views || 0), 0);
     const viewLimit = user?.limits?.monthlyLimit || 10000;
+
 
     const filteredProjects = projects.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -196,11 +199,21 @@ export default function Projects() {
                         <Database className="h-5 w-5 text-green-500" />
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-bold text-white">850</span>
-                        <span className="text-sm text-slate-500">MB</span>
+                        <span className="text-3xl font-bold text-white">
+                            {user?.usage?.storageUsed < 1024 * 1024
+                                ? `${(user?.usage?.storageUsed / 1024).toFixed(1)} KB`
+                                : user?.usage?.storageUsed < 1024 * 1024 * 1024
+                                    ? `${(user?.usage?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                    : `${(user?.usage?.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                            }
+                        </span>
+                        <span className="text-sm text-slate-500">/ {user?.usage?.storageLimit < 1024 * 1024 * 1024 ? `${(user?.usage?.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(user?.usage?.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</span>
                     </div>
                     <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-800">
-                        <div className="h-full w-[45%] bg-green-500" />
+                        <div
+                            className="h-full bg-green-500 transition-all duration-500"
+                            style={{ width: `${Math.min((user?.usage?.storageUsed / user?.usage?.storageLimit) * 100, 100)}%` }}
+                        />
                     </div>
                 </div>
             </div>
@@ -219,90 +232,186 @@ export default function Projects() {
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex items-center bg-slate-950 rounded-lg border border-slate-800 p-1">
-                        <button className="p-1.5 rounded hover:bg-slate-800 text-blue-400 bg-slate-800/50">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'text-blue-400 bg-slate-800/50' : 'text-slate-400 hover:text-white'}`}
+                        >
                             <Grid className="h-4 w-4" />
                         </button>
-                        <button className="p-1.5 rounded hover:bg-slate-800 text-slate-400">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'text-blue-400 bg-slate-800/50' : 'text-slate-400 hover:text-white'}`}
+                        >
                             <List className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Projects Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProjects.map((project) => (
-                    <div
-                        key={project.id}
-                        onClick={() => navigate(`/projects/${project.id}`)}
-                        className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col cursor-pointer"
+            {/* Projects View */}
+            {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProjects.map((project) => (
+                        <div
+                            key={project.id}
+                            onClick={() => navigate(`/projects/${encodeURIComponent(project.name)}`)}
+                            className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col cursor-pointer"
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-blue-500/10 rounded-lg">
+                                    <Layout className="h-6 w-6 text-blue-500" />
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleTogglePin(project);
+                                        }}
+                                        className={`p-1.5 rounded-lg hover:bg-slate-800 transition-colors ${project.is_pinned ? 'text-blue-400 opacity-100' : 'text-slate-400'}`}
+                                    >
+                                        <Pin className={`h-4 w-4 ${project.is_pinned ? 'fill-current' : ''}`} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDelete(project.id);
+                                        }}
+                                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mb-6 flex-1">
+                                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                                    {project.name}
+                                </h3>
+                                <p className="text-slate-400 text-sm line-clamp-2">
+                                    Real-time visitor tracking dashboard for {project.name}. Monitor traffic and analytics.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                                        <Eye className="h-4 w-4 text-slate-500" />
+                                        <span>{stats[project.id]?.total_views?.toLocaleString() || 0} views</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                                        <Users className="h-4 w-4 text-slate-500" />
+                                        <span>{stats[project.id]?.sessionCount?.toLocaleString() || 0} sessions</span>
+                                    </div>
+                                </div>
+                                <Link
+                                    to={`/projects/${encodeURIComponent(project.name)}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-medium group/link"
+                                >
+                                    View Analytics
+                                    <ArrowRight className="h-4 w-4 group-hover/link:translate-x-0.5 transition-transform" />
+                                </Link>
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* New Project Card */}
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="border border-dashed border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group min-h-[250px]"
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-blue-500/10 rounded-lg">
-                                <Layout className="h-6 w-6 text-blue-500" />
-                            </div>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleTogglePin(project);
-                                    }}
-                                    className={`p-1.5 rounded-lg hover:bg-slate-800 transition-colors ${project.is_pinned ? 'text-blue-400 opacity-100' : 'text-slate-400'}`}
-                                >
-                                    <Pin className={`h-4 w-4 ${project.is_pinned ? 'fill-current' : ''}`} />
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(project.id);
-                                    }}
-                                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
+                        <div className="p-4 bg-slate-900 rounded-full group-hover:scale-110 transition-transform">
+                            <Plus className="h-6 w-6 text-slate-400 group-hover:text-blue-400" />
                         </div>
-
-                        <div className="mb-6 flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
-                                {project.name}
-                            </h3>
-                            <p className="text-slate-400 text-sm line-clamp-2">
-                                Real-time visitor tracking dashboard for {project.name}. Monitor traffic and analytics.
-                            </p>
+                        <div className="text-center">
+                            <h3 className="text-white font-medium mb-1">New Project</h3>
+                            <p className="text-slate-500 text-sm">Create a new tracking project</p>
                         </div>
-
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                <Eye className="h-4 w-4 text-slate-500" />
-                                <span>{stats[project.id]?.total_views?.toLocaleString() || 0} views</span>
-                            </div>
-                            <Link
-                                to={`/projects/${project.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-medium group/link"
-                            >
-                                View Analytics
-                                <ArrowRight className="h-4 w-4 group-hover/link:translate-x-0.5 transition-transform" />
-                            </Link>
-                        </div>
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-slate-800 text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    <th className="px-6 py-4">Project Name</th>
+                                    <th className="px-6 py-4">Total Views</th>
+                                    <th className="px-6 py-4">Sessions</th>
+                                    <th className="px-6 py-4">Storage</th>
+                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                                {filteredProjects.map((project) => (
+                                    <tr
+                                        key={project.id}
+                                        onClick={() => navigate(`/projects/${encodeURIComponent(project.name)}`)}
+                                        className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                                    >
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-500/10 rounded-lg">
+                                                    <Layout className="h-4 w-4 text-blue-500" />
+                                                </div>
+                                                <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{project.name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                            {stats[project.id]?.total_views?.toLocaleString() || 0}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                            {stats[project.id]?.sessionCount?.toLocaleString() || 0}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                            {stats[project.id]?.storageUsed < 1024 * 1024
+                                                ? `${(stats[project.id]?.storageUsed / 1024).toFixed(1)} KB`
+                                                : `${(stats[project.id]?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                            }
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 text-green-400 text-xs font-medium rounded-full border border-green-500/20">
+                                                <div className="w-1 h-1 rounded-full bg-green-500" />
+                                                Active
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleTogglePin(project);
+                                                    }}
+                                                    className={`p-1.5 rounded-lg hover:bg-slate-800 transition-colors ${project.is_pinned ? 'text-blue-400' : 'text-slate-400'}`}
+                                                >
+                                                    <Pin className={`h-4 w-4 ${project.is_pinned ? 'fill-current' : ''}`} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(project.id);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                ))}
-
-                {/* New Project Card */}
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="border border-dashed border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group min-h-[250px]"
-                >
-                    <div className="p-4 bg-slate-900 rounded-full group-hover:scale-110 transition-transform">
-                        <Plus className="h-6 w-6 text-slate-400 group-hover:text-blue-400" />
-                    </div>
-                    <div className="text-center">
-                        <h3 className="text-white font-medium mb-1">New Project</h3>
-                        <p className="text-slate-500 text-sm">Create a new tracking project</p>
-                    </div>
-                </button>
-            </div>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="w-full py-4 border border-dashed border-slate-800 rounded-xl flex items-center justify-center gap-2 text-slate-400 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span className="text-sm font-medium">Create New Project</span>
+                    </button>
+                </div>
+            )}
 
             <Modal
                 isOpen={showModal}
