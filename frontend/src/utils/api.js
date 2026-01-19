@@ -3,7 +3,7 @@ const getApiUrl = () => {
   if (envUrl) {
     return envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/$/, '')}/v1`;
   }
-  return import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1';
+  return import.meta.env.PROD ? 'https://obs-real-time-tracker.vercel.app/api/v1' : 'http://localhost:5000/api/v1';
 };
 
 const API_URL = getApiUrl();

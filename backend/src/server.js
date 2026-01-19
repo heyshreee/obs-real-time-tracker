@@ -18,6 +18,7 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://obs-real-time-tracker-s5do.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     methods: ['GET', 'POST'],
@@ -42,6 +43,9 @@ app.use(cors({
     const dashboardOrigins = [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
+      'https://obs-real-time-tracker-s5do.vercel.app',
+      'https://obs-real-time-tracker-s5do-puoj1meir-sris-projects-8ff08b1b.vercel.app',
+      'https://obs-real-time-tracker-s5do-git-main-sris-projects-8ff08b1b.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
