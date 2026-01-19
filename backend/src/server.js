@@ -43,6 +43,7 @@ app.use(cors({
     const dashboardOrigins = [
       'http://localhost:5173',
       'http://127.0.0.1:5173',
+      'https://obs-real-time-tracker-s5do.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
