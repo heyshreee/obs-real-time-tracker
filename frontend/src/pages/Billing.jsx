@@ -137,7 +137,7 @@ export default function Billing() {
                         <tr>
                             <td className="px-6 py-4 font-medium text-white">Monthly Views</td>
                             <td className="px-6 py-4">10,000</td>
-                            <td className="px-6 py-4 text-blue-400 font-bold">1,000,000</td>
+                            <td className="px-6 py-4 text-blue-400 font-bold">500,000</td>
                         </tr>
                         <tr>
                             <td className="px-6 py-4 font-medium text-white">Projects</td>

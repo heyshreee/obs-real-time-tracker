@@ -6,7 +6,7 @@ const PLAN_LIMITS = {
         storageLimit: 1 * 1024 * 1024 * 1024 // 1GB
     },
     pro: {
-        monthlyViews: 1000000,
+        monthlyViews: 500000,
         storageLimit: 10 * 1024 * 1024 * 1024 // 10GB
     },
     enterprise: {
