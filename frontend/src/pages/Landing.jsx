@@ -260,16 +260,16 @@ export default function Landing() {
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                        {/* Starter */}
+                        {/* STARTER */}
                         <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Starter</h3>
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">STARTER</h3>
                             <div className="flex items-baseline gap-1 mb-6">
                                 <span className="text-4xl font-bold text-white">$0</span>
                                 <span className="text-slate-500">/mo</span>
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 10,000 views/month
+                                    <Check className="h-4 w-4 text-green-500" /> 10k events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> 10 Projects
@@ -283,26 +283,26 @@ export default function Landing() {
                             </Link>
                         </div>
 
-                        {/* Pro Streamer */}
+                        {/* PRO STREAMER */}
                         <div className="p-8 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform md:-translate-y-4">
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-blue-500 rounded-full text-xs font-bold text-white border border-blue-400">MOST POPULAR</div>
-                            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-2">Pro Streamer</h3>
+                            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-2">PRO STREAMER</h3>
                             <div className="flex items-baseline gap-1 mb-6">
                                 <span className="text-4xl font-bold text-white">$29</span>
                                 <span className="text-blue-200">/mo</span>
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Unlimited views
+                                    <Check className="h-4 w-4 text-white" /> 500k events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> Unlimited Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Advanced Audience Insights
+                                    <Check className="h-4 w-4 text-white" /> AI-Powered Insights
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Priority Support
+                                    <Check className="h-4 w-4 text-white" /> Email Notifications
                                 </li>
                             </ul>
                             <Link to="/register" className="block w-full py-3 px-4 rounded-xl bg-white text-blue-600 text-center font-bold hover:bg-blue-50 transition-colors">
@@ -310,25 +310,24 @@ export default function Landing() {
                             </Link>
                         </div>
 
-                        {/* Studio */}
+                        {/* SCALE / ORG */}
                         <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Studio / Org</h3>
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">SCALE / ORG</h3>
                             <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$99</span>
-                                <span className="text-slate-500">/mo</span>
+                                <span className="text-4xl font-bold text-white">Custom</span>
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Everything in Pro
+                                    <Check className="h-4 w-4 text-green-500" /> Custom volume
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> API Access
+                                    <Check className="h-4 w-4 text-green-500" /> Unlimited Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom Retention Policies
+                                    <Check className="h-4 w-4 text-green-500" /> Advanced AI Models
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Dedicated Account Manager
+                                    <Check className="h-4 w-4 text-green-500" /> Custom Email Reports
                                 </li>
                             </ul>
                             <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">

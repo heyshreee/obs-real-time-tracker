@@ -18,7 +18,6 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'https://heyshree.site',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     methods: ['GET', 'POST'],
@@ -35,19 +34,25 @@ const cookieParser = require('cookie-parser');
 
 app.use(helmet());
 app.use(cookieParser());
+// Custom CORS wrapper to exclude tracking endpoint
 app.use(cors({
   origin: (origin, callback) => {
-    const allowedOrigins = [
+    // For v1 routes, we handle CORS in the router/middleware
+    // For other routes (like root or legacy), we use this simple check
+    const dashboardOrigins = [
       'http://localhost:5173',
-      'http://localhost:5174',
-      'https://heyshree.site',
+      'http://127.0.0.1:5173',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow tracking routes to pass through global CORS
+    // They will be handled by trackingCors middleware in the router
+    if (!origin || dashboardOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // We'll allow the origin here but the trackingCors middleware will do the final check
+      // This is necessary because Express middleware order means global CORS runs first
+      callback(null, true);
     }
   },
   credentials: true
@@ -55,11 +60,10 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/visitors', visitorRoutes);
-app.use('/api/projects', require('./routes/project.routes'));
-app.use('/api/track', require('./routes/track.routes'));
-app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/v1', require('./routes/v1'));
+
+// Legacy routes (optional: keep for backward compatibility or remove)
+// For now, I'll remove them as requested by the "Clean Architecture" section
 
 // Socket.io setup
 setupVisitorSocket(io);

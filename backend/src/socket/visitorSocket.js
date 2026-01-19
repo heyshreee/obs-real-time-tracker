@@ -27,7 +27,22 @@ module.exports = (io) => {
         socket.join(`user_${socket.user.id}`);
         console.log(`User ${socket.user.id} joined room user_${socket.user.id}`);
 
+        // Periodic Auth Revalidation (every 5 minutes)
+        const revalidateInterval = setInterval(() => {
+            try {
+                const cookies = cookie.parse(socket.request.headers.cookie || '');
+                const token = cookies.token;
+                if (!token) throw new Error('No token');
+                verifyToken(token);
+            } catch (error) {
+                console.log(`Socket auth failed for user ${socket.user.id}, disconnecting...`);
+                socket.emit('error', { message: 'Session expired' });
+                socket.disconnect();
+            }
+        }, 5 * 60 * 1000);
+
         socket.on('disconnect', () => {
+            clearInterval(revalidateInterval);
             console.log('Client disconnected');
         });
     });

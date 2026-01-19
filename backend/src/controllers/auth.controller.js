@@ -50,6 +50,10 @@ exports.register = async (req, res) => {
 
         const token = generateToken(newUser.id);
 
+        // Audit Log
+        const { logAction } = require('../services/audit.service');
+        await logAction(newUser.id, 'USER_REGISTER');
+
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -91,6 +95,10 @@ exports.login = async (req, res) => {
         }
 
         const token = generateToken(user.id);
+
+        // Audit Log
+        const { logAction } = require('../services/audit.service');
+        await logAction(user.id, 'USER_LOGIN');
 
         res.cookie('token', token, {
             httpOnly: true,

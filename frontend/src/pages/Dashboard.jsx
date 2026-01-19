@@ -40,36 +40,34 @@ export default function Dashboard() {
     sparkline: []
   });
 
+  const [timeRange, setTimeRange] = useState('30d');
+
   useEffect(() => {
     loadData();
 
-    // Socket.io connection
     // Socket.io connection
     const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
       withCredentials: true
     });
 
-    // Connection is now authenticated via cookie automatically
-
     socket.on('visitor_update', () => {
       loadData(false);
     });
 
-    // Poll for real-time updates every 1 second as backup
-    const interval = setInterval(() => loadData(false), 1000);
+    const interval = setInterval(() => loadData(false), 1000); // 1s polling
 
     return () => {
       clearInterval(interval);
       socket.disconnect();
     };
-  }, [user?.id]);
+  }, [user?.id, timeRange]); // Re-fetch when timeRange changes
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const [projectsData, statsData] = await Promise.all([
         apiRequest('/projects'),
-        apiRequest('/visitors/dashboard-stats').catch(() => null) // Handle error gracefully
+        apiRequest(`/analytics/overview?range=${timeRange}`).catch(() => null)
       ]);
 
       setProjects(projectsData);
@@ -80,13 +78,15 @@ export default function Dashboard() {
 
       if (projectsData.length > 0) {
         const statsPromises = projectsData.map(p =>
-          apiRequest(`/projects/${p.id}/stats`).catch(() => null)
+          apiRequest(`/analytics/projects/${p.id}/overview`).catch(() => null)
         );
         const allStats = await Promise.all(statsPromises);
 
         const projectStats = projectsData.map((p, i) => ({
           ...p,
           views: allStats[i]?.current_month_views || 0,
+          sessions: allStats[i]?.sessionCount || 0,
+          storageUsed: allStats[i]?.storageUsed || 0,
         }));
 
         projectStats.sort((a, b) => b.views - a.views);
@@ -95,7 +95,6 @@ export default function Dashboard() {
         setStats([]);
       }
     } catch (err) {
-      // Only show toast on initial load error to avoid spamming
       if (showLoading) showToast(err.message, 'error');
       console.error(err);
     } finally {
@@ -202,8 +201,16 @@ export default function Dashboard() {
               <p className="text-sm text-slate-400">Tracking views across all domains</p>
             </div>
             <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-              <button className="px-3 py-1 text-xs font-medium text-slate-400 hover:text-white transition-colors">7D</button>
-              <button className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded shadow-sm">30D</button>
+              {['24h', '7d', '30d'].map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === range ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  {range.toUpperCase()}
+                </button>
+              ))}
             </div>
           </div>
           <div className="h-[200px] w-full">
@@ -216,7 +223,14 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748B" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="#64748B"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={30}
+                />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', color: '#F8FAFC' }}
                   itemStyle={{ color: '#F8FAFC' }}
@@ -273,7 +287,7 @@ export default function Dashboard() {
                     <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    from <span className="text-slate-300">{activity.location}</span> on <span className="text-slate-300">{activity.site}</span>
+                    from <span className="text-slate-300">{activity.title || 'Unknown Page'}</span>, <span className="text-slate-300 capitalize">{activity.device || 'Desktop'}</span> on <span className="text-slate-300">{activity.ip}</span>
                   </p>
                   <p className="text-[10px] text-slate-500 mt-1">
                     {new Date(activity.timestamp).toLocaleTimeString()}
