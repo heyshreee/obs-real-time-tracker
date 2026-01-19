@@ -22,6 +22,8 @@ const io = new Server(server, {
       'https://obs-real-time-tracker-s5do-puoj1meir-sris-projects-8ff08b1b.vercel.app',
       'https://obs-real-time-tracker-s5do-git-main-sris-projects-8ff08b1b.vercel.app',
       'https://obs-tracker.netlify.app/',
+      'https://obs-real-time-tracker-s5do-puoj1meir-sris-projects-8ff08b1b.vercel.app',
+      'https://obs-real-time-tracker-s5do-git-main-sris-projects-8ff08b1b.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean),
     methods: ['GET', 'POST'],
