@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom
 import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
   Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
-  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database
+  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database, RefreshCw
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -46,6 +46,8 @@ export default function ProjectDetail() {
   const [allowedOrigins, setAllowedOrigins] = useState('');
   const [projectName, setProjectName] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [shareToken, setShareToken] = useState('');
   const [timezone, setTimezone] = useState('(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi');
   const [notifications, setNotifications] = useState({
     trafficSpikes: true,
@@ -57,6 +59,7 @@ export default function ProjectDetail() {
   // Modal State
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showPagesModal, setShowPagesModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [activityData, setActivityData] = useState([]);
   const [pagesData, setPagesData] = useState([]);
   const [loadingModalData, setLoadingModalData] = useState(false);
@@ -105,7 +108,9 @@ export default function ProjectDetail() {
       setProject(projectData);
       setProjectName(projectData.name);
       setAllowedOrigins(projectData.allowed_origins || '');
-      setTargetUrl(projectData.allowed_origins ? projectData.allowed_origins.split(',')[0] : '');
+      setTargetUrl(projectData.target_url || '');
+      setIsActive(projectData.is_active !== false); // Default to true if undefined
+      setShareToken(projectData.share_token || '');
       if (projectData.timezone) setTimezone(projectData.timezone);
       if (projectData.notifications) setNotifications(projectData.notifications);
 
@@ -162,7 +167,7 @@ export default function ProjectDetail() {
       // Update name/targetUrl if editing in Profile tab
       const body = {};
       if (activeTab === 'settings') {
-        body.allowedOrigins = allowedOrigins;
+        // body.allowedOrigins = allowedOrigins; // Moved to profile
       } else if (activeTab === 'profile') {
         if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
           showToast('Project name can only contain letters, numbers, underscores, and hyphens', 'error');
@@ -170,7 +175,9 @@ export default function ProjectDetail() {
           return;
         }
         body.name = projectName;
-        body.allowedOrigins = targetUrl; // Simple mapping for now
+        body.allowedOrigins = allowedOrigins;
+        body.targetUrl = targetUrl;
+        body.isActive = isActive;
         body.timezone = timezone;
         body.notifications = notifications;
       }
@@ -262,16 +269,25 @@ export default function ProjectDetail() {
           </div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-white">{project.name}</h1>
-            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-green-500/10 text-green-400 text-xs font-medium rounded-full border border-green-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              LIVE
-            </span>
+            <div className={`px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1.5 ${isActive
+              ? 'bg-green-500/10 text-green-400 border-green-500/20'
+              : 'bg-red-500/10 text-red-400 border-red-500/20'
+              }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
+              {isActive ? 'LIVE' : 'DISABLED'}
+            </div>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors">
-          <Share2 className="h-4 w-4" />
-          Share Report
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors border border-slate-700"
+          >
+            <Share2 className="h-4 w-4" />
+            Share Report
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -606,181 +622,158 @@ export default function ProjectDetail() {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {activeTab === 'profile' && (
+        <div className="space-y-6">
+          {/* Project Information */}
           <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-slate-400" />
-                <h2 className="text-lg font-semibold text-white">Allowed Origins</h2>
+            <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
+            <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
               </div>
-              {!editing ? (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="text-sm text-blue-400 hover:text-blue-300 font-medium"
-                >
-                  Edit
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setEditing(false);
-                      setAllowedOrigins(project.allowed_origins || '');
-                    }}
-                    className="p-1 text-slate-400 hover:text-white"
-                    title="Cancel"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={handleSaveSettings}
-                    disabled={saving}
-                    className="p-1 text-blue-400 hover:text-blue-300 disabled:opacity-50"
-                    title="Save"
-                  >
-                    {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                  </button>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={allowedOrigins}
+                    onChange={(e) => setAllowedOrigins(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Add domain..."
+                  />
+                  {allowedOrigins && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                      {allowedOrigins.split(',').map((origin, i) => (
+                        <span key={i} className="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          {origin.trim()}
+                          <button onClick={() => {
+                            const newOrigins = allowedOrigins.split(',').filter((_, idx) => idx !== i).join(',');
+                            setAllowedOrigins(newOrigins);
+                          }} className="hover:text-white"><X className="h-3 w-3" /></button>
+                        </span>
+                      )).slice(0, 2)}
+                      {allowedOrigins.split(',').length > 2 && (
+                        <span className="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">+{allowedOrigins.split(',').length - 2}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                <p className="text-xs text-slate-500 mt-1">Specify the domains allowed to send tracking data. CORS requests from other origins will be blocked.</p>
+              </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              >
+                <option value="Asia/Kolkata">(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
+                <option value="UTC">(GMT+00:00) UTC</option>
+                <option value="America/New_York">(GMT-05:00) Eastern Time (US & Canada)</option>
+                <option value="America/Los_Angeles">(GMT-08:00) Pacific Time (US & Canada)</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Changes
+            </button>
+          </div>
+
+          {/* Notification Preferences */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-1">Notification Preferences</h2>
+            <p className="text-sm text-slate-400 mb-6">Stay updated on your website's traffic performance.</p>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-white">Traffic Spikes</h3>
+                  <p className="text-xs text-slate-400">Get an email notification when traffic increases by more than 50% in an hour.</p>
+                </div>
+                <button
+                  onClick={() => setNotifications(prev => ({ ...prev, trafficSpikes: !prev.trafficSpikes }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.trafficSpikes ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.trafficSpikes ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-800 pt-6">
+                <div>
+                  <h3 className="text-sm font-medium text-white">Weekly Digest</h3>
+                  <p className="text-xs text-slate-400">Receive a weekly summary of your top performing pages and visitor growth.</p>
+                </div>
+                <button
+                  onClick={() => setNotifications(prev => ({ ...prev, weeklyDigest: !prev.weeklyDigest }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${notifications.weeklyDigest ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.weeklyDigest ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Disable Project */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-500/10 rounded-lg">
+                <Activity className="h-6 w-6 text-red-500" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-semibold text-red-400">Disable Project</h2>
+                  <button
+                    onClick={() => setIsActive(!isActive)}
+                    className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {isActive ? 'Disable This Project' : 'Enable This Project'}
+                  </button>
+                </div>
+                <p className="text-sm text-slate-400">Disabling a project will stop all tracking events immediately but will preserve your historical data.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Delete Project */}
+          <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-500/10 rounded-lg">
+                <Trash2 className="h-6 w-6 text-red-500" />
+              </div>
               <div>
-                {editing ? (
-                  <div>
-                    <input
-                      type="text"
-                      value={allowedOrigins}
-                      onChange={(e) => setAllowedOrigins(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://example.com, http://localhost:3000"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">Comma separated list of domains allowed to track. Leave empty to allow all.</p>
-                  </div>
-                ) : (
-                  <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 min-h-[42px] flex items-center">
-                    {project.allowed_origins ? (
-                      <code className="text-sm text-slate-300 font-mono">{project.allowed_origins}</code>
-                    ) : (
-                      <span className="text-sm text-slate-500 italic">All origins allowed</span>
-                    )}
-                  </div>
-                )}
+                <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
+                <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete This Project'}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )
-      }
-
-      {
-        activeTab === 'profile' && (
-          <div className="space-y-6">
-            {/* Project Information */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
-              <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
-                  <input
-                    type="text"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Target URL</label>
-                  <input
-                    type="text"
-                    value={targetUrl}
-                    onChange={(e) => setTargetUrl(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
-                <select
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                >
-                  <option value="Asia/Kolkata">(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
-                  <option value="UTC">(GMT+00:00) UTC</option>
-                  <option value="America/New_York">(GMT-05:00) Eastern Time (US & Canada)</option>
-                  <option value="America/Los_Angeles">(GMT-08:00) Pacific Time (US & Canada)</option>
-                </select>
-              </div>
-
-              <button
-                onClick={handleSaveSettings}
-                disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save Changes
-              </button>
-            </div>
-
-            {/* Notification Preferences */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold text-white mb-1">Notification Preferences</h2>
-              <p className="text-sm text-slate-400 mb-6">Stay updated on your website's traffic performance.</p>
-
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-white">Traffic Spikes</h3>
-                    <p className="text-xs text-slate-400">Get an email notification when traffic increases by more than 50% in an hour.</p>
-                  </div>
-                  <button
-                    onClick={() => setNotifications(prev => ({ ...prev, trafficSpikes: !prev.trafficSpikes }))}
-                    className={`w-11 h-6 rounded-full transition-colors relative ${notifications.trafficSpikes ? 'bg-blue-600' : 'bg-slate-700'}`}
-                  >
-                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.trafficSpikes ? 'translate-x-5' : ''}`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between border-t border-slate-800 pt-6">
-                  <div>
-                    <h3 className="text-sm font-medium text-white">Weekly Digest</h3>
-                    <p className="text-xs text-slate-400">Receive a weekly summary of your top performing pages and visitor growth.</p>
-                  </div>
-                  <button
-                    onClick={() => setNotifications(prev => ({ ...prev, weeklyDigest: !prev.weeklyDigest }))}
-                    className={`w-11 h-6 rounded-full transition-colors relative ${notifications.weeklyDigest ? 'bg-blue-600' : 'bg-slate-700'}`}
-                  >
-                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${notifications.weeklyDigest ? 'translate-x-5' : ''}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Delete Project */}
-            <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-red-500/10 rounded-lg">
-                  <Trash2 className="h-6 w-6 text-red-500" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
-                  <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
-                  >
-                    {deleting ? 'Deleting...' : 'Delete This Project'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
       }
       {/* Modals */}
       <Modal
@@ -866,6 +859,45 @@ export default function ProjectDetail() {
           )}
         </div>
       </Modal>
-    </div>
+
+      {/* Share Report Modal */}
+      <Modal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title="Share Public Report"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            Anyone with this link can view the read-only stats for this project.
+          </p>
+
+          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2">
+            <code className="flex-1 text-sm text-blue-400 truncate">
+              {`${window.location.origin}/share/${shareToken}`}
+            </code>
+            <CopyButton text={`${window.location.origin}/share/${shareToken}`} />
+          </div>
+
+          <div className="pt-4 border-t border-slate-800">
+            <button
+              onClick={async () => {
+                if (!window.confirm('This will invalidate the old link. Continue?')) return;
+                try {
+                  const data = await apiRequest(`/projects/${project.id}/regenerate-token`, { method: 'POST' });
+                  setShareToken(data.share_token);
+                  showToast('Link regenerated successfully', 'success');
+                } catch (err) {
+                  showToast('Failed to regenerate link', 'error');
+                }
+              }}
+              className="text-sm text-red-400 hover:text-red-300 flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Regenerate Link
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div >
   );
 }

@@ -11,7 +11,7 @@ import Spinner from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
 
 export default function Projects() {
-    const { user, loadUser, loadSidebarData } = useOutletContext();
+    const { user, loadUser, loadSidebarData, usageStats } = useOutletContext();
     const [projects, setProjects] = useState([]);
     const [stats, setStats] = useState({});
     const [showModal, setShowModal] = useState(false);
@@ -203,19 +203,19 @@ export default function Projects() {
                     </div>
                     <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-bold text-white">
-                            {user?.usage?.storageUsed < 1024 * 1024
-                                ? `${(user?.usage?.storageUsed / 1024).toFixed(1)} KB`
-                                : user?.usage?.storageUsed < 1024 * 1024 * 1024
-                                    ? `${(user?.usage?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
-                                    : `${(user?.usage?.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                            {usageStats?.storageUsed < 1024 * 1024
+                                ? `${(usageStats?.storageUsed / 1024).toFixed(1)} KB`
+                                : usageStats?.storageUsed < 1024 * 1024 * 1024
+                                    ? `${(usageStats?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                    : `${(usageStats?.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
                             }
                         </span>
-                        <span className="text-sm text-slate-500">/ {user?.usage?.storageLimit < 1024 * 1024 * 1024 ? `${(user?.usage?.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(user?.usage?.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</span>
+                        <span className="text-sm text-slate-500">/ {usageStats?.storageLimit < 1024 * 1024 * 1024 ? `${(usageStats?.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(usageStats?.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</span>
                     </div>
                     <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-800">
                         <div
                             className="h-full bg-green-500 transition-all duration-500"
-                            style={{ width: `${Math.min((user?.usage?.storageUsed / user?.usage?.storageLimit) * 100, 100)}%` }}
+                            style={{ width: `${Math.min((usageStats?.storageUsed / usageStats?.storageLimit) * 100, 100)}%` }}
                         />
                     </div>
                 </div>

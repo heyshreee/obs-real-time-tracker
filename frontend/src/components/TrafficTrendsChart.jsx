@@ -38,7 +38,7 @@ export default function TrafficTrendsChart({
                         <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
                     </div>
                 )}
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <AreaChart data={data || []}>
                         <defs>
                             <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">

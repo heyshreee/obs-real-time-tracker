@@ -308,7 +308,7 @@ export default function Layout() {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-                    <Outlet context={{ user, loadUser, loadSidebarData }} />
+                    <Outlet context={{ user, loadUser, loadSidebarData, usageStats }} />
                 </main>
             </div>
         </div>

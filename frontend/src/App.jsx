@@ -4,6 +4,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Spinner from './components/Spinner';
 
+const ShareReport = lazy(() => import('./pages/ShareReport'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -39,6 +40,7 @@ function App() {
                         <Suspense fallback={<Spinner />}>
                             <Routes>
                                 {/* Public Routes */}
+                                <Route path="/share/:shareToken" element={<ShareReport />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
 

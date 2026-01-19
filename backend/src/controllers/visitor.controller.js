@@ -447,6 +447,27 @@ exports.trackVisitorPublic = async (req, res) => {
             return res.json({ success: true, bot: true });
         }
 
+        // Fetch Project
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id, user_id, allowed_origins, is_active')
+            .eq('tracking_id', trackingId)
+            .single();
+
+        if (!project) {
+            return res.status(404).json({ error: 'INVALID_TRACKING_ID', message: 'Invalid tracking code' });
+        }
+
+        if (project.is_active === false) {
+            return res.status(403).json({ error: 'Project is disabled' });
+        }
+
+        // Check Limits
+        const limitCheck = await usageService.checkLimit(project.user_id);
+        if (!limitCheck.canTrack) {
+            return res.status(403).json({ error: 'LIMIT_EXCEEDED', message: limitCheck.reason });
+        }
+
         // 3. Tracking Abuse Prevention (Hashing + Rolling TTL)
         const hitHash = generateHitHash(ip, userAgent, trackingId);
         const now = Date.now();
@@ -456,22 +477,6 @@ exports.trackVisitorPublic = async (req, res) => {
             if (now - lastHit < 30000) { // 30 seconds TTL
                 return res.json({ success: true, ignored: 'DUPLICATE_HIT' });
             }
-        }
-        requestCache.set(hitHash, now);
-
-        const { data: project } = await supabase
-            .from('projects')
-            .select('id, user_id, allowed_origins')
-            .eq('tracking_id', trackingId)
-            .single();
-
-        if (!project) {
-            return res.status(404).json({ error: 'INVALID_TRACKING_ID', message: 'Invalid tracking code' });
-        }
-
-        // Check limits
-        const limitCheck = await usageService.checkLimit(project.user_id);
-        if (!limitCheck.canTrack) {
             return res.status(403).json({ error: 'LIMIT_EXCEEDED', message: limitCheck.reason });
         }
 

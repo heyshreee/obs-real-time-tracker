@@ -36,7 +36,7 @@ exports.calculateUsage = async (userId) => {
         .single();
 
     const plan = user?.plan || 'free';
-    const limits = this.getPlanLimits(plan);
+    const limits = exports.getPlanLimits(plan);
 
     // 2. Calculate Views (Current Month)
     const { data: projects } = await supabase
