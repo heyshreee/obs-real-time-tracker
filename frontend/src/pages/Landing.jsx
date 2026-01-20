@@ -269,7 +269,7 @@ export default function Landing() {
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 10k events/mo
+                                    <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> 10 Projects

@@ -4,7 +4,7 @@ export const getApiUrl = () => {
     return envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/$/, '')}/v1`;
   }
   // return import.meta.env.PROD ? 'https://api-obs-iota.vercel.app/api/v1' : 'https://api-9ne7dgt9v-sris-projects-8ff08b1b.vercel.app/api/v1';
-  return import.meta.env.PROD ? 'http://localhost:5000/api/v1' : 'http://localhost:3000/api/v1';
+  return import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1';
 };
 
 const API_URL = getApiUrl();

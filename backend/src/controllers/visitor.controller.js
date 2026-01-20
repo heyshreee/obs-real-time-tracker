@@ -5,6 +5,7 @@ const { validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
 const { getClientIp } = require('../utils/ip');
 const crypto = require('crypto');
+const NotificationService = require('../services/notification.service');
 
 // Simple in-memory cache for deduplication (rolling TTL)
 const requestCache = new Map();
@@ -460,6 +461,26 @@ exports.trackVisitorPublic = async (req, res) => {
 
         if (project.is_active === false) {
             return res.status(403).json({ error: 'Project is disabled' });
+        }
+
+        // Check Allowed Origins
+        const origin = req.headers['origin'] || req.headers['referer'];
+        if (project.allowed_origins && project.allowed_origins.length > 0 && origin) {
+            const originHostname = new URL(origin).hostname;
+            const isAllowed = project.allowed_origins.some(allowed => 
+                originHostname === allowed || originHostname.endsWith('.' + allowed)
+            );
+
+            if (!isAllowed) {
+                // Notify user about blocked origin
+                await NotificationService.create(
+                    project.user_id,
+                    'Security Alert: Origin Blocked',
+                    `Blocked request from unauthorized origin: ${originHostname} for project "${project.name || 'Unknown'}"`,
+                    'security'
+                );
+                return res.status(403).json({ error: 'ORIGIN_NOT_ALLOWED' });
+            }
         }
 
         // Check Limits

@@ -10,6 +10,7 @@ const visitorRoutes = require('./routes/visitor.routes');
 // const analyticsRoutes = require('./routes/analytics.routes');
 // const paymentRoutes = require('./routes/payment.routes');
 const setupVisitorSocket = require('./socket/visitorSocket');
+const NotificationService = require('./services/notification.service');
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy (Vercel)
@@ -79,4 +80,9 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Cleanup old notifications every hour
+  setInterval(() => {
+    NotificationService.cleanup();
+  }, 60 * 60 * 1000);
 });

@@ -165,7 +165,7 @@ export default function ProjectActivity() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
                     <div className="flex items-center gap-4">
                         <Link
-                            to={`/projects/${idOrName}`}
+                            to={`/dashboard/projects/${idOrName}`}
                             className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400 hover:text-white"
                         >
                             <ArrowLeft className="h-5 w-5" />

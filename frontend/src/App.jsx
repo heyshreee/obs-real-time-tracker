@@ -13,6 +13,7 @@ const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
 const ProjectActivity = lazy(() => import('./pages/ProjectActivity'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Billing = lazy(() => import('./pages/Billing'));
+const APIKeys = lazy(() => import('./pages/APIKeys'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Blog = lazy(() => import('./pages/Blog'));
@@ -45,7 +46,7 @@ function App() {
                                 <Route path="/register" element={<Register />} />
 
                                 <Route
-                                    path="/projects/:idOrName/activity"
+                                    path="/dashboard/projects/:idOrName/activity"
                                     element={
                                         <PrivateRoute>
                                             <ProjectActivity />
@@ -64,16 +65,15 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/projects"
+                                        path="/dashboard/projects"
                                         element={
                                             <PrivateRoute>
                                                 <Projects />
                                             </PrivateRoute>
                                         }
                                     />
-
                                     <Route
-                                        path="/projects/:idOrName/:tab?"
+                                        path="/dashboard/projects/:idOrName/:tab?"
                                         element={
                                             <PrivateRoute>
                                                 <ProjectDetail />
@@ -81,7 +81,15 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/profile"
+                                        path="/dashboard/api-key"
+                                        element={
+                                            <PrivateRoute>
+                                                <APIKeys />
+                                            </PrivateRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/dashboard/profile"
                                         element={
                                             <PrivateRoute>
                                                 <Profile />
@@ -89,7 +97,7 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/billing"
+                                        path="/dashboard/billing"
                                         element={
                                             <PrivateRoute>
                                                 <Billing />

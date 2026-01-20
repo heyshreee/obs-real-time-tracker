@@ -353,7 +353,7 @@ export default function Dashboard() {
           </div>
           <h3 className="text-white font-bold text-lg mb-1">Monthly Usage</h3>
           <p className="text-sm text-slate-400 mb-4">{totalViewsUsed.toLocaleString()} / {viewLimit.toLocaleString()} views</p>
-          <Link to="/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1 font-medium transition-colors">
+          <Link to="/dashboard/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1 font-medium transition-colors">
             Upgrade Capacity <ArrowUpRight className="h-3 w-3" />
           </Link>
         </div>

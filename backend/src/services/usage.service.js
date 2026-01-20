@@ -1,17 +1,21 @@
 const supabase = require('../config/supabase');
+const NotificationService = require('./notification.service');
 
 const PLAN_LIMITS = {
     free: {
-        monthlyViews: 10000,
-        storageLimit: 1 * 1024 * 1024 * 1024 // 1GB
+        monthlyViews: 1000,
+        storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
+        projectLimit: 10
     },
     pro: {
         monthlyViews: 500000,
-        storageLimit: 10 * 1024 * 1024 * 1024 // 10GB
+        storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
+        projectLimit: 100
     },
     enterprise: {
         monthlyViews: 1000000000, // Effectively unlimited
-        storageLimit: 100 * 1024 * 1024 * 1024 // 100GB
+        storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
+        projectLimit: 1000
     }
 };
 
@@ -72,12 +76,14 @@ exports.calculateUsage = async (userId) => {
     // Update storage_used in users table (as requested)
     // We do this asynchronously and don't block the return
     supabase.from('users')
-        .update({ storage_used: storageUsed })
+        .update({
+            storage_used: Math.round(storageUsed),
+            storage_limit: Math.round(limits.storageLimit)
+        })
         .eq('id', userId)
         .then(({ error }) => {
-            if (error) console.error('Failed to update storage_used in supabase:', error);
+            if (error) console.error('Failed to update storage stats in supabase:', error);
         });
-
     return {
         totalViews,
         monthlyLimit: limits.monthlyViews,
@@ -87,7 +93,8 @@ exports.calculateUsage = async (userId) => {
             visitors: visitorStorage,
             pageViews: viewStorage
         },
-        plan
+        plan,
+        projectLimit: limits.projectLimit
     };
 };
 
@@ -127,11 +134,64 @@ exports.calculateProjectUsage = async (projectId) => {
 /**
  * Check if a user can still track data
  */
-exports.checkLimit = async (userId) => {
+exports.checkLimit = async (userId, type = 'track') => {
     const usage = await this.calculateUsage(userId);
+
+    if (type === 'create_project') {
+        const { count } = await supabase
+            .from('projects')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        const projectsOk = (count || 0) < usage.projectLimit;
+
+        if (!projectsOk) {
+            await NotificationService.create(
+                userId,
+                'Plan Limit Reached',
+                `You have reached the maximum number of projects for your plan. Upgrade to create more.`,
+                'warning'
+            );
+        }
+
+        return {
+            canTrack: projectsOk,
+            reason: !projectsOk ? 'Project limit reached. Upgrade to Pro.' : null,
+            usage
+        };
+    }
 
     const viewsOk = usage.totalViews < usage.monthlyLimit;
     const storageOk = usage.storageUsed < usage.storageLimit;
+
+    // Check for 80% usage warning
+    if (usage.totalViews > usage.monthlyLimit * 0.8 && usage.totalViews < usage.monthlyLimit) {
+        await NotificationService.create(
+            userId,
+            'Usage Alert: Near Limit',
+            `You have reached 80% of your monthly tracking limit. Upgrade soon to avoid data gaps.`,
+            'system'
+        );
+    }
+
+    // Check for 100% usage
+    if (usage.totalViews >= usage.monthlyLimit) {
+        await NotificationService.create(
+            userId,
+            'Usage Alert: Limit Reached',
+            `You have reached 100% of your monthly tracking limit. Tracking may be paused.`,
+            'error'
+        );
+    }
+
+    if (usage.storageUsed >= usage.storageLimit) {
+        await NotificationService.create(
+            userId,
+            'Storage Alert: Full',
+            `You have reached your storage limit. Old data may be deleted or tracking paused.`,
+            'error'
+        );
+    }
 
     return {
         canTrack: viewsOk && storageOk,
