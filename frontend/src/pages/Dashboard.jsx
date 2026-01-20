@@ -46,7 +46,7 @@ export default function Dashboard() {
     loadData();
 
     // Socket.io connection (Skip on Vercel due to lack of WebSocket support)
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     let socket;
 
     if (!apiUrl.includes('vercel.app')) {

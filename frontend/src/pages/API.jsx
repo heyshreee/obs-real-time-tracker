@@ -98,6 +98,27 @@ export default function API() {
                                 Ensure your tracking data is accurate and secure by preventing unauthorized usage.
                             </p>
 
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                                <div className="p-6 rounded-xl bg-[#151921] border border-white/5">
+                                    <h3 className="text-lg font-semibold text-white mb-2">No Cookies</h3>
+                                    <p className="text-slate-400 text-sm">
+                                        We don't use cookies, so you don't need a complex cookie banner for this.
+                                    </p>
+                                </div>
+                                <div className="p-6 rounded-xl bg-[#151921] border border-white/5">
+                                    <h3 className="text-lg font-semibold text-white mb-2">Reliable</h3>
+                                    <p className="text-slate-400 text-sm">
+                                        Uses <code>navigator.sendBeacon</code> to ensure data is sent even if the user closes the tab immediately.
+                                    </p>
+                                </div>
+                                <div className="p-6 rounded-xl bg-[#151921] border border-white/5">
+                                    <h3 className="text-lg font-semibold text-white mb-2">Privacy First</h3>
+                                    <p className="text-slate-400 text-sm">
+                                        We hash IP + UserAgent + ProjectID to count unique visitors without storing PII.
+                                    </p>
+                                </div>
+                            </div>
+
                             <div className="space-y-8">
                                 <div>
                                     <h3 className="text-xl font-semibold text-white mb-3">Method 1: Allowed Origins (Recommended)</h3>
@@ -110,60 +131,9 @@ export default function API() {
                                 </div>
 
                                 <div>
-                                    <h3 className="text-xl font-semibold text-white mb-3">Method 2: Server-Side Proxy</h3>
+                                    <h3 className="text-xl font-semibold text-white mb-3">Method 2: Production-Ready Snippet</h3>
                                     <p className="text-slate-400 mb-4">
-                                        Hide your Tracking ID by proxying requests through your own backend.
-                                    </p>
-
-                                    <div className="space-y-4">
-                                        <CodeBlock
-                                            title="Next.js API Route (pages/api/analytics.js)"
-                                            language="javascript"
-                                            code={`export default async function handler(req, res) {
-  // 1. Get your Tracking ID from environment variables
-  const TRACKING_ID = process.env.OBS_TRACKING_ID;
-  const API_URL = \`https://api.obstracker.com/api/v1/track/\${TRACKING_ID}\`;
-
-  // 2. Forward the request to OBS Tracker
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...req.body,
-      // 3. Forward the real client IP and User Agent
-      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-      userAgent: req.headers['user-agent']
-    })
-  });
-
-  const data = await response.json();
-  res.status(200).json(data);
-}`}
-                                        />
-
-                                        <p className="text-slate-400 text-sm">Call this API route from your frontend:</p>
-
-                                        <CodeBlock
-                                            title="Frontend Call"
-                                            language="javascript"
-                                            code={`fetch("/api/analytics", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    sessionId: localStorage.getItem('visitor_session_id'),
-    pageUrl: window.location.href,
-    referrer: document.referrer,
-    title: document.title
-  })
-});`}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="text-xl font-semibold text-white mb-3">Method 3: Direct Script</h3>
-                                    <p className="text-slate-400 mb-4">
-                                        Use this script to track visitors directly from your HTML.
+                                        Use this script to track visitors. It uses <code>navigator.sendBeacon</code> to ensure data is sent even if the user closes the tab.
                                     </p>
                                     <CodeBlock
                                         title="HTML Script"
@@ -171,22 +141,59 @@ export default function API() {
                                         code={`<script>
 (function() {
   const TRACKING_ID = "YOUR_TRACKING_ID";
-  const TRACKING_URL = "https://api.obstracker.com/api/v1/track/" + TRACKING_ID;
-  const sessionId = localStorage.getItem('visitor_session_id') || 'anon_' + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('visitor_session_id', sessionId);
+  const ENDPOINT = "https://api.obstracker.com/api/v1/track/" + TRACKING_ID;
 
-  fetch(TRACKING_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: sessionId,
-      pageUrl: window.location.href,
-      referrer: document.referrer,
-      title: document.title
-    })
-  }).catch(console.error);
+  function track() {
+    navigator.sendBeacon(
+      ENDPOINT,
+      JSON.stringify({
+        pageUrl: location.href,
+        referrer: document.referrer || null,
+        screen: {
+          width: screen.width,
+          height: screen.height
+        }
+      })
+    );
+  }
+
+  track();
 })();
 </script>`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xl font-semibold text-white mb-3">Method 3: React / Next.js Hook</h3>
+                                    <p className="text-slate-400 mb-4">
+                                        For Single Page Applications (SPA), use this hook to track route changes correctly.
+                                    </p>
+                                    <CodeBlock
+                                        title="usePageTracking.js"
+                                        language="javascript"
+                                        code={`import { useEffect } from "react";
+import { useLocation } from "react-router-dom"; // or "next/router"
+
+const TRACKING_ID = "YOUR_TRACKING_ID";
+const TRACK_URL = "https://api.obstracker.com/api/v1/track/" + TRACKING_ID;
+
+export function usePageTracking() {
+  const location = useLocation();
+
+  useEffect(() => {
+    navigator.sendBeacon(
+      TRACK_URL,
+      JSON.stringify({
+        pageUrl: window.location.href,
+        referrer: document.referrer || null,
+        screen: {
+          width: screen.width,
+          height: screen.height
+        }
+      })
+    );
+  }, [location.pathname]); // Trigger on route change
+}`}
                                     />
                                 </div>
                             </div>

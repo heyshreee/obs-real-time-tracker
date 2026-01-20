@@ -245,20 +245,23 @@ export default function ProjectDetail() {
   const trackingSnippet = `<script>
 (function() {
   const TRACKING_ID = "${trackingId}";
-  const TRACKING_URL = "${trackingUrl}";
-  const sessionId = localStorage.getItem('visitor_session_id') || 'anon_' + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('visitor_session_id', sessionId);
+  const ENDPOINT = "${trackingUrl}";
 
-  fetch(TRACKING_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: sessionId,
-      pageUrl: window.location.href,
-      referrer: document.referrer,
-      title: document.title
-    })
-  }).catch(console.error);
+  function track() {
+    navigator.sendBeacon(
+      ENDPOINT,
+      JSON.stringify({
+        pageUrl: location.href,
+        referrer: document.referrer || null,
+        screen: {
+          width: screen.width,
+          height: screen.height
+        }
+      })
+    );
+  }
+
+  track();
 })();
 </script>`;
 
