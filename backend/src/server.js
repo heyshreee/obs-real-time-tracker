@@ -74,6 +74,7 @@ app.use('/api/v1', require('./routes/v1'));
 
 // Legacy routes (optional: keep for backward compatibility or remove)
 // For now, I'll remove them as requested by the "Clean Architecture" section
+app.use('/api/track', require('./routes/v1/track.routes'));
 
 // Socket.io setup
 setupVisitorSocket(io);

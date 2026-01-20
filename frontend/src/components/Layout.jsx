@@ -43,27 +43,30 @@ export default function Layout() {
         loadUser();
         loadSidebarData();
 
-        // Socket connection
-        socketRef.current = io(API_URL, {
-            withCredentials: true
-        });
+        // Socket connection (Skip on Vercel)
+        if (!API_URL.includes('vercel.app')) {
+            socketRef.current = io(API_URL, {
+                withCredentials: true,
+                transports: ['websocket', 'polling']
+            });
 
-        socketRef.current.on('connect', () => {
-            if (user) {
-                socketRef.current.emit('join', `user_${user.id}`);
-            }
-        });
+            socketRef.current.on('connect', () => {
+                if (user) {
+                    socketRef.current.emit('join', `user_${user.id}`);
+                }
+            });
 
-        socketRef.current.on('usage_update', (data) => {
-            setUsageStats(prev => ({
-                ...prev,
-                totalViews: data.totalViews,
-                storageUsed: data.storageUsed,
-                storageLimit: data.storageLimit
-            }));
-        });
+            socketRef.current.on('usage_update', (data) => {
+                setUsageStats(prev => ({
+                    ...prev,
+                    totalViews: data.totalViews,
+                    storageUsed: data.storageUsed,
+                    storageLimit: data.storageLimit
+                }));
+            });
+        }
 
-        const interval = setInterval(() => loadSidebarData(), 1000);
+        const interval = setInterval(() => loadSidebarData(), 5000); // Poll every 5s
 
         return () => {
             clearInterval(interval);

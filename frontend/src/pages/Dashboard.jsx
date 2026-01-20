@@ -45,20 +45,26 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
 
-    // Socket.io connection
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true
-    });
+    // Socket.io connection (Skip on Vercel due to lack of WebSocket support)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    let socket;
 
-    socket.on('visitor_update', () => {
-      loadData(false);
-    });
+    if (!apiUrl.includes('vercel.app')) {
+      socket = io(apiUrl, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    const interval = setInterval(() => loadData(false), 1000); // 1s polling
+      socket.on('visitor_update', () => {
+        loadData(false);
+      });
+    }
+
+    const interval = setInterval(() => loadData(false), 5000); // Poll every 5s instead of 1s to save resources
 
     return () => {
       clearInterval(interval);
-      socket.disconnect();
+      if (socket) socket.disconnect();
     };
   }, [user?.id, timeRange]); // Re-fetch when timeRange changes
 
@@ -179,9 +185,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Mini Bar Chart for visual effect */}
           <div className="h-16 mt-4 -mx-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={sparkline || []}>
                 <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                   {(sparkline || []).map((entry, index) => (
@@ -212,123 +217,122 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
-          </div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trafficData}>
-                <defs>
-                  <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  stroke="#64748B"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={30}
-                />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', color: '#F8FAFC' }}
-                  itemStyle={{ color: '#F8FAFC' }}
-                />
-                <Area type="monotone" dataKey="views" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorViews)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 3. Top Referral Sources */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-6">Top Referral Sources</h3>
-          <div className="space-y-6">
-            {sourceData.map((source) => (
-              <div key={source.name}>
-                <div className="flex justify-between text-sm mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: source.color }}></span>
-                    <span className="text-white font-medium">{source.name}</span>
-                  </div>
-                  <span className="text-slate-400">{source.value.toLocaleString()}</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${(source.value / 5000) * 100}%`, backgroundColor: source.color }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 4. Live Activity */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Live Activity</h3>
-            <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">Streaming</span>
-          </div>
-          <div className="space-y-6 relative">
-            {/* Vertical line */}
-            <div className="absolute left-1.5 top-2 bottom-2 w-px bg-slate-800"></div>
-
-            {liveActivity.map((activity) => (
-              <div key={activity.id} className="flex gap-4 relative">
-                <div className={`w-3 h-3 rounded-full mt-1.5 border-2 border-slate-900 z-10 flex-shrink-0 ${activity.type === 'session' ? 'bg-blue-500' :
-                  activity.type === 'view' ? 'bg-slate-500' : 'bg-purple-500'
-                  }`}></div>
-                <div>
-                  <p className="text-sm text-white">
-                    <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    from <span className="text-slate-300">{activity.title || 'Unknown Page'}</span>, <span className="text-slate-300 capitalize">{activity.device || 'Desktop'}</span> on <span className="text-slate-300">{activity.ip}</span>
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    {new Date(activity.timestamp).toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 5. Monthly Usage */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-          <div className="relative w-40 h-40 mb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={75}
-                  startAngle={90}
-                  endAngle={-270}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  <Cell key="used" fill="#3B82F6" />
-                  <Cell key="remaining" fill="#1E293B" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold text-white">{Math.round(viewPercentage)}%</span>
-              <span className="text-xs text-slate-500 uppercase">Limit</span>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <AreaChart data={trafficData}>
+                  <defs>
+                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#64748B"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={30}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', color: '#F8FAFC' }}
+                    itemStyle={{ color: '#F8FAFC' }}
+                  />
+                  <Area type="monotone" dataKey="views" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorViews)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          <h3 className="text-white font-medium mb-1">Monthly Usage</h3>
-          <p className="text-sm text-slate-400 mb-4">{totalViewsUsed.toLocaleString()} / {viewLimit.toLocaleString()} views</p>
-          <Link to="/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1">
-            Upgrade Capacity <ExternalLink className="h-3 w-3" />
-          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 3. Top Referral Sources */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-6">Top Referral Sources</h3>
+            <div className="space-y-6">
+              {sourceData.map((source) => (
+                <div key={source.name}>
+                  <div className="flex justify-between text-sm mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: source.color }}></span>
+                      <span className="text-white font-medium">{source.name}</span>
+                    </div>
+                    <span className="text-slate-400">{source.value.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${(source.value / 5000) * 100}%`, backgroundColor: source.color }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Live Activity */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Live Activity</h3>
+              <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">Streaming</span>
+            </div>
+            <div className="space-y-6 relative">
+              {/* Vertical line */}
+              <div className="absolute left-1.5 top-2 bottom-2 w-px bg-slate-800"></div>
+
+              {liveActivity.map((activity) => (
+                <div key={activity.id} className="flex gap-4 relative">
+                  <div className={`w-3 h-3 rounded-full mt-1.5 border-2 border-slate-900 z-10 flex-shrink-0 ${activity.type === 'session' ? 'bg-blue-500' :
+                    activity.type === 'view' ? 'bg-slate-500' : 'bg-purple-500'
+                    }`}></div>
+                  <div>
+                    <p className="text-sm text-white">
+                      <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      from <span className="text-slate-300">{activity.title || 'Unknown Page'}</span>, <span className="text-slate-300 capitalize">{activity.device || 'Desktop'}</span> on <span className="text-slate-300">{activity.ip}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      {new Date(activity.timestamp).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+            <div className="relative w-40 h-40 mb-4">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={75}
+                    startAngle={90}
+                    endAngle={-270}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    <Cell key="used" fill="#3B82F6" />
+                    <Cell key="remaining" fill="#1E293B" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold text-white">{Math.round(viewPercentage)}%</span>
+                <span className="text-xs text-slate-500 uppercase">Limit</span>
+              </div>
+            </div>
+            <h3 className="text-white font-medium mb-1">Monthly Usage</h3>
+            <p className="text-sm text-slate-400 mb-4">{totalViewsUsed.toLocaleString()} / {viewLimit.toLocaleString()} views</p>
+            <Link to="/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1">
+              Upgrade Capacity <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </div>
 

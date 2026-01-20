@@ -11,14 +11,15 @@ import {
 } from 'recharts';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { apiRequest } from '../utils/api';
+import { apiRequest, getApiUrl } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import Modal from '../components/Modal';
 import TrafficTrendsChart from '../components/TrafficTrendsChart';
 import { useToast } from '../context/ToastContext';
 import { io } from 'socket.io-client';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
+const API_URL = getApiUrl();
+const SOCKET_URL = API_URL.replace('/api/v1', '');
 
 export default function ProjectDetail() {
   const { idOrName, tab } = useParams();
@@ -80,21 +81,25 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (!project?.id) return;
 
-    // Socket connection
-    const socket = io(API_URL, {
-      withCredentials: true
-    });
+    // Socket connection (Skip on Vercel)
+    let socket;
+    if (!SOCKET_URL.includes('vercel.app')) {
+      socket = io(SOCKET_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    socket.on('visitor_update', (data) => {
-      if (project && data.project_id && data.project_id !== project.id) return;
-      loadStats(project.id, false);
-    });
+      socket.on('visitor_update', (data) => {
+        if (project && data.project_id && data.project_id !== project.id) return;
+        loadStats(project.id, false);
+      });
+    }
 
-    const interval = setInterval(() => loadStats(project.id, false), 1000);
+    const interval = setInterval(() => loadStats(project.id, false), 5000); // Poll every 5s
 
     return () => {
       clearInterval(interval);
-      socket.disconnect();
+      if (socket) socket.disconnect();
     };
   }, [project?.id, timeRange, timezone]);
 
