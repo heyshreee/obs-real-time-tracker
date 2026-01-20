@@ -221,11 +221,11 @@ export default function Layout() {
                                 <span className="text-[10px] font-semibold text-slate-400 uppercase">Storage Used ({usageStats.plan})</span>
                                 <span className="text-[10px] font-bold text-white">
                                     {usageStats.storageUsed < 1024 * 1024
-                                        ? `${(usageStats.storageUsed / 1024).toFixed(1)} KB`
+                                        ? `${(usageStats.storageUsed / 1024).toFixed(2)} KB`
                                         : usageStats.storageUsed < 1024 * 1024 * 1024
-                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(2)} MB`
                                             : `${(usageStats.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
-                                    }
+                                    } <span className="text-slate-500 font-normal">/ {usageStats.storageLimit < 1024 * 1024 * 1024 ? `${(usageStats.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(usageStats.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</span>
                                 </span>
                             </div>
                             <div className="h-1 bg-slate-700 rounded-full overflow-hidden">

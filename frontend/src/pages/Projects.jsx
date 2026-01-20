@@ -204,9 +204,9 @@ export default function Projects() {
                     <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-bold text-white">
                             {usageStats?.storageUsed < 1024 * 1024
-                                ? `${(usageStats?.storageUsed / 1024).toFixed(1)} KB`
+                                ? `${(usageStats?.storageUsed / 1024).toFixed(2)} KB`
                                 : usageStats?.storageUsed < 1024 * 1024 * 1024
-                                    ? `${(usageStats?.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                    ? `${(usageStats?.storageUsed / (1024 * 1024)).toFixed(2)} MB`
                                     : `${(usageStats?.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
                             }
                         </span>
@@ -287,7 +287,7 @@ export default function Projects() {
                             </div>
 
                             <div className="mb-6 flex-1">
-                                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors truncate" title={project.name}>
                                     {project.name}
                                 </h3>
                                 <p className="text-slate-400 text-sm line-clamp-2">
@@ -358,7 +358,7 @@ export default function Projects() {
                                                 <div className="p-2 bg-blue-500/10 rounded-lg">
                                                     <Layout className="h-4 w-4 text-blue-500" />
                                                 </div>
-                                                <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{project.name}</span>
+                                                <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors truncate max-w-[200px]" title={project.name}>{project.name}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">

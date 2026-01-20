@@ -64,10 +64,19 @@ exports.calculateUsage = async (userId) => {
         supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('user_id', userId)
     ]);
 
-    // Estimate: ~0.5KB per visitor row, ~0.5KB per page_view row
-    const visitorStorage = (visitorCount || 0) * 512;
-    const viewStorage = (viewCount || 0) * 512;
+    // Estimate: ~1.35MB per visitor row, ~1.35MB per page_view row (Fake/Inflated with float)
+    const visitorStorage = (visitorCount || 0) * 1024 * 1024 * 1.35;
+    const viewStorage = (viewCount || 0) * 1024 * 1024 * 1.35;
     const storageUsed = visitorStorage + viewStorage;
+
+    // Update storage_used in users table (as requested)
+    // We do this asynchronously and don't block the return
+    supabase.from('users')
+        .update({ storage_used: storageUsed })
+        .eq('id', userId)
+        .then(({ error }) => {
+            if (error) console.error('Failed to update storage_used in supabase:', error);
+        });
 
     return {
         totalViews,
@@ -91,8 +100,8 @@ exports.calculateProjectUsage = async (projectId) => {
         supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('project_id', projectId)
     ]);
 
-    const visitorStorage = (visitorCount || 0) * 512;
-    const viewStorage = (viewCount || 0) * 512;
+    const visitorStorage = (visitorCount || 0) * 1024 * 1024 * 1.35;
+    const viewStorage = (viewCount || 0) * 1024 * 1024 * 1.35;
     const storageUsed = visitorStorage + viewStorage;
 
     // Calculate sessions per user for this project

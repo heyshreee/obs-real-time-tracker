@@ -398,7 +398,7 @@ export default function ProjectDetail() {
                     )}
                     <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
                     <div>
-                      <p className="text-sm text-white">
+                      <p className="text-sm text-white truncate" title={activity.title || 'Unknown Page'}>
                         <span className="font-medium">{activity.title || 'Unknown Page'}</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5 font-mono">
@@ -430,8 +430,8 @@ export default function ProjectDetail() {
                 {overviewStats.topReferrers?.map((referrer, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white font-medium">{referrer.name}</span>
-                      <span className="text-slate-400">{referrer.value.toLocaleString()} views ({Math.round((referrer.value / (overviewStats.total_views || 1)) * 100)}%)</span>
+                      <span className="text-white font-medium truncate pr-2" title={referrer.name}>{referrer.name}</span>
+                      <span className="text-slate-400 whitespace-nowrap">{referrer.value.toLocaleString()} views ({Math.round((referrer.value / (overviewStats.total_views || 1)) * 100)}%)</span>
                     </div>
                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div
