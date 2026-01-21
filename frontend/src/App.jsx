@@ -24,6 +24,7 @@ const Integrations = lazy(() => import('./pages/Integrations'));
 const Documentation = lazy(() => import('./pages/Documentation'));
 const Community = lazy(() => import('./pages/Community'));
 const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 import { ToastProvider } from './context/ToastContext';
 import { isAuthenticated } from './utils/auth';
 import './App.css';
@@ -118,6 +119,7 @@ function App() {
                                 <Route path="/privacy" element={<Legal type="privacy" />} />
                                 <Route path="/terms" element={<Legal type="terms" />} />
                                 <Route path="/cookies" element={<Legal type="cookies" />} />
+                                <Route path="*" element={<NotFound />} />
                             </Routes>
                         </Suspense>
                     </div>
