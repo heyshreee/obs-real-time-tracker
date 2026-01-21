@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Zap, Layers } from 'lucide-react';
+import { Check, Zap, Layers, X, ArrowUpRight, Download, CreditCard, Calendar, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
 
@@ -9,10 +9,11 @@ export default function Billing() {
     const [stats, setStats] = useState(null);
     const [usageStats, setUsageStats] = useState({
         totalViews: 0,
-        monthlyLimit: 10000,
+        monthlyLimit: 1000,
         storageUsed: 0,
         storageLimit: 1024 * 1024 * 1024,
-        plan: 'free'
+        plan: 'free',
+        projectLimit: 5
     });
 
     useEffect(() => {
@@ -47,126 +48,285 @@ export default function Billing() {
         }
     };
 
-    const viewLimit = usageStats.monthlyLimit || 10000;
+    const viewLimit = usageStats.monthlyLimit || 1000;
     const totalViewsUsed = usageStats.totalViews || 0;
     const viewPercentage = Math.min((totalViewsUsed / viewLimit) * 100, 100);
-    const storagePercentage = Math.min((usageStats.storageUsed / usageStats.storageLimit) * 100, 100);
+    const projectsCount = stats?.projectsCount || 0;
+    const projectLimit = usageStats?.projectLimit || 5;
+    const projectPercentage = Math.min((projectsCount / projectLimit) * 100, 100);
 
-    const formatSize = (bytes) => {
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    const getNextResetDate = () => {
+        const now = new Date();
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        return nextMonth.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
     };
 
     return (
-        <div>
-            <h1 className="text-3xl font-bold text-white mb-8">Billing & Plans</h1>
-
-            {/* 1. Usage Summary */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mb-8">
-                <h2 className="text-lg font-semibold text-white mb-4">Current Usage</h2>
-
-                {/* Monthly Views */}
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-slate-300">
-                        <Zap className="h-5 w-5 text-yellow-400" />
-                        <span>Monthly Views</span>
-                    </div>
-                    <span className="text-white font-medium">
-                        {totalViewsUsed.toLocaleString()} <span className="text-slate-500">/ {viewLimit.toLocaleString()}</span>
-                    </span>
-                </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden mb-6">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${viewPercentage}%` }}
-                        className={`h-full rounded-full ${viewPercentage >= 90 ? 'bg-red-500' : 'bg-yellow-500'}`}
-                    />
-                </div>
-
-                {/* Storage Usage */}
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-slate-300">
-                        <Layers className="h-5 w-5 text-green-400" />
-                        <span>Storage Used</span>
-                    </div>
-                    <span className="text-white font-medium">
-                        {formatSize(usageStats.storageUsed)} <span className="text-slate-500">/ {formatSize(usageStats.storageLimit)}</span>
-                    </span>
-                </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden mb-6">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${storagePercentage}%` }}
-                        className={`h-full rounded-full ${storagePercentage >= 90 ? 'bg-red-500' : 'bg-green-500'}`}
-                    />
-                </div>
-
-                {/* Projects */}
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-slate-300">
-                        <Layers className="h-5 w-5 text-blue-400" />
-                        <span>Projects</span>
-                    </div>
-                    <span className="text-white font-medium">
-                        {stats?.projectsCount || 0} <span className="text-slate-500">/ {user?.limits?.projectLimit || 10}</span>
-                    </span>
-                </div>
-                <div className="h-3 bg-slate-800 rounded-full overflow-hidden mb-2">
-                    <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${((stats?.projectsCount || 0) / (user?.limits?.projectLimit || 10)) * 100}%` }}
-                        className={`h-full rounded-full ${(stats?.projectsCount || 0) >= (user?.limits?.projectLimit || 10) ? 'bg-red-500' : 'bg-blue-500'}`}
-                    />
-                </div>
-                <p className="text-xs text-slate-500 mt-4">Usage data updates in real-time</p>
-            </div>
-
-            {/* 2. Plan Comparison */}
-            <h2 className="text-xl font-bold text-white mb-6">Plan Comparison</h2>
-            <div className="overflow-hidden rounded-2xl border border-slate-800">
-                <table className="w-full text-left text-sm text-slate-400">
-                    <thead className="bg-slate-900 text-slate-200 uppercase font-medium">
-                        <tr>
-                            <th className="px-6 py-4">Feature</th>
-                            <th className="px-6 py-4">Free</th>
-                            <th className="px-6 py-4">Pro</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800 bg-slate-900/50">
-                        <tr>
-                            <td className="px-6 py-4 font-medium text-white">Monthly Views</td>
-                            <td className="px-6 py-4">1,000</td>
-                            <td className="px-6 py-4 text-blue-400 font-bold">500,000</td>
-                        </tr>
-                        <tr>
-                            <td className="px-6 py-4 font-medium text-white">Projects</td>
-                            <td className="px-6 py-4">10</td>
-                            <td className="px-6 py-4 text-blue-400 font-bold">100</td>
-                        </tr>
-                        <tr>
-                            <td className="px-6 py-4 font-medium text-white">Real-time Logs</td>
-                            <td className="px-6 py-4">Manual Refresh</td>
-                            <td className="px-6 py-4 text-blue-400 font-bold">Live Streaming</td>
-                        </tr>
-                        <tr>
-                            <td className="px-6 py-4 font-medium text-white">Support</td>
-                            <td className="px-6 py-4">Community</td>
-                            <td className="px-6 py-4 text-blue-400 font-bold">Priority</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* 3. Upgrade Action */}
-            <div className="mt-8 text-center">
-                {user.plan === 'free' ? (
-                    <button disabled className="px-6 py-3 bg-slate-800 text-slate-400 rounded-lg cursor-not-allowed">
-                        Upgrade Coming Soon
+        <div className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-2xl font-bold text-white">Billing & Subscription</h1>
+                <div className="flex items-center gap-4">
+                    <button className="p-2 text-slate-400 hover:text-white transition-colors">
+                        <Clock className="h-5 w-5" />
                     </button>
-                ) : (
-                    <p className="text-green-400 font-medium">You are on the Pro Plan</p>
-                )}
+                </div>
+            </div>
+
+            {/* Top Section: Current Plan & Usage */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+                {/* Current Plan Card */}
+                <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-32 -mt-32 rounded-full"></div>
+
+                    <div className="flex justify-between items-start mb-12 relative z-10">
+                        <div>
+                            <p className="text-sm font-medium text-slate-400 mb-1">Current Plan</p>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-4xl font-bold text-white capitalize">{usageStats.plan} Plan</h2>
+                                <span className="px-2.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-bold rounded-full uppercase tracking-wider border border-slate-700">Current</span>
+                            </div>
+                        </div>
+                        <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95">
+                            Upgrade Now
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-5">
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Monthly Limit</p>
+                            <p className="text-xl font-bold text-white">{viewLimit.toLocaleString()} views</p>
+                        </div>
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-5">
+                            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Next Reset</p>
+                            <p className="text-xl font-bold text-white">{getNextResetDate()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Usage Card */}
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col">
+                    <div className="flex items-center gap-2 mb-8">
+                        <Zap className="h-5 w-5 text-blue-400 fill-blue-400/20" />
+                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Usage This Month</h3>
+                    </div>
+
+                    <div className="space-y-8 flex-1">
+                        <div>
+                            <div className="flex justify-between items-end mb-2">
+                                <p className="text-sm font-medium text-slate-400">Project Views</p>
+                                <p className="text-sm font-bold text-white">
+                                    {totalViewsUsed.toLocaleString()} <span className="text-slate-500">/ {viewLimit.toLocaleString()}</span>
+                                </p>
+                            </div>
+                            <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${viewPercentage}%` }}
+                                    className="h-full bg-blue-500 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between items-end mb-2">
+                                <p className="text-sm font-medium text-slate-400">Active Projects</p>
+                                <p className="text-sm font-bold text-white">
+                                    {projectsCount} <span className="text-slate-500">/ {projectLimit}</span>
+                                </p>
+                            </div>
+                            <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${projectPercentage}%` }}
+                                    className="h-full bg-blue-500 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 mt-8 italic leading-relaxed">
+                        Resets automatically at the start of next billing cycle.
+                    </p>
+                </div>
+            </div>
+
+            {/* Plan Comparison Section */}
+            <div className="mb-16">
+                <h2 className="text-2xl font-bold text-white mb-2">Choose your plan</h2>
+                <p className="text-slate-400 text-sm mb-10">Pick the best plan that fits your growth needs.</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Free Plan */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
+                        <div className="mb-8">
+                            <h3 className="text-xl font-bold text-white mb-2">Free</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">Perfect for side projects and small experiments.</p>
+                        </div>
+
+                        <div className="mb-10">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-bold text-white">$0</span>
+                                <span className="text-slate-500 font-medium">/month</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 mb-10 flex-1">
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">{(usageStats?.monthlyViews || 1000).toLocaleString()} Views / mo</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">{usageStats?.projectLimit || 5} Active Projects</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-slate-500">
+                                <div className="w-5 h-5 rounded-full bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                                    <X className="h-3 w-3" />
+                                </div>
+                                <span>Priority Support</span>
+                            </div>
+                        </div>
+
+                        <button
+                            disabled={usageStats.plan === 'free'}
+                            className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
+                        >
+                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade'}
+                        </button>
+                    </div>
+
+                    {/* Pro Plan */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-blue-600/50 rounded-3xl p-8 flex flex-col h-full relative shadow-[0_0_40px_rgba(37,99,235,0.1)] group">
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                            <span className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg shadow-blue-600/20">Recommended</span>
+                        </div>
+
+                        <div className="mb-8">
+                            <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">Scale your monitoring with unlimited power.</p>
+                        </div>
+
+                        <div className="mb-10">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-bold text-white">$29</span>
+                                <span className="text-slate-500 font-medium">/month</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 mb-10 flex-1">
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">Unlimited Views</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">Unlimited Projects</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">Priority Email Support</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">Custom Domain Tracking</span>
+                            </div>
+                        </div>
+
+                        <button
+                            disabled={usageStats.plan === 'pro'}
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
+                        >
+                            {usageStats.plan === 'pro' ? 'Active Plan' : 'Upgrade to Pro'}
+                        </button>
+                    </div>
+
+                    {/* Enterprise Plan */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
+                        <div className="mb-8">
+                            <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed">Custom features and dedicated infrastructure.</p>
+                        </div>
+
+                        <div className="mb-10">
+                            <h3 className="text-4xl font-bold text-white">Custom</h3>
+                        </div>
+
+                        <div className="space-y-4 mb-10 flex-1">
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">White-label Reports</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">API Access</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                </div>
+                                <span className="text-slate-300">Dedicated Manager</span>
+                            </div>
+                        </div>
+
+                        <button className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 active:scale-[0.98]">
+                            Contact Sales
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Payment History Section */}
+            <div className="mb-12">
+                <h2 className="text-2xl font-bold text-white mb-2">Payment History</h2>
+                <p className="text-slate-400 text-sm mb-8">Download your previous invoices and receipts.</p>
+
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-slate-800/50 bg-slate-950/30">
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Invoice ID</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Amount</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
+                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/30">
+                                {/* Placeholder row if no history */}
+                                <tr className="group hover:bg-slate-800/10 transition-colors">
+                                    <td className="px-8 py-6 text-sm font-medium text-slate-300">INV-2024-001</td>
+                                    <td className="px-8 py-6 text-sm text-slate-400">Jan 01, 2024</td>
+                                    <td className="px-8 py-6 text-sm font-bold text-white">$0.00</td>
+                                    <td className="px-8 py-6">
+                                        <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">Paid</span>
+                                    </td>
+                                    <td className="px-8 py-6 text-right">
+                                        <button className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all">
+                                            <Download className="h-4 w-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     );

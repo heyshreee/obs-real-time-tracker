@@ -5,17 +5,26 @@ const PLAN_LIMITS = {
     free: {
         monthlyViews: 1000,
         storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
-        projectLimit: 10
+        projectLimit: 5,
+        liveLogs: false,
+        emailIntegrity: false,
+        allowedOriginsLimit: 1
     },
     pro: {
-        monthlyViews: 500000,
+        monthlyViews: 100000,
         storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 100
+        projectLimit: 100,
+        liveLogs: true,
+        emailIntegrity: true,
+        allowedOriginsLimit: 10
     },
     enterprise: {
         monthlyViews: 1000000000, // Effectively unlimited
         storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
-        projectLimit: 1000
+        projectLimit: 1000,
+        liveLogs: true,
+        emailIntegrity: true,
+        allowedOriginsLimit: 999
     }
 };
 
@@ -87,6 +96,7 @@ exports.calculateUsage = async (userId) => {
     return {
         totalViews,
         monthlyLimit: limits.monthlyViews,
+        monthlyViews: limits.monthlyViews,
         storageUsed,
         storageLimit: limits.storageLimit,
         storageBreakdown: {
@@ -152,6 +162,24 @@ exports.checkLimit = async (userId, type = 'track') => {
                 `You have reached the maximum number of projects for your plan. Upgrade to create more.`,
                 'warning'
             );
+
+            // Log to activity logs
+            const ActivityLogService = require('./activity.service');
+            const { data: projects } = await supabase
+                .from('projects')
+                .select('id')
+                .eq('user_id', userId)
+                .limit(1);
+
+            if (projects && projects.length > 0) {
+                await ActivityLogService.log(
+                    projects[0].id,
+                    userId,
+                    'Plan Limit Reached',
+                    `Project creation blocked: ${usage.plan} plan limit of ${usage.projectLimit} projects reached`,
+                    'warning'
+                );
+            }
         }
 
         return {

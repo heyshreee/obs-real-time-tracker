@@ -8,6 +8,7 @@ import {
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import Spinner from '../components/Spinner';
+import io from 'socket.io-client';
 
 export default function ActivityLog() {
     const { idOrName } = useParams();
@@ -25,6 +26,28 @@ export default function ActivityLog() {
     useEffect(() => {
         if (project?.id) {
             loadLogs();
+
+            // Setup Socket.IO for real-time updates
+            const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+                transports: ['websocket', 'polling']
+            });
+
+            // Join project room
+            socket.emit('join_project', project.id);
+
+            // Listen for new activity logs
+            socket.on('activity_new', (newLog) => {
+                // Only add if we're on page 1 and filters match
+                if (page === 1) {
+                    setLogs(prevLogs => [newLog, ...prevLogs.slice(0, 9)]);
+                    setTotalLogs(prev => prev + 1);
+                }
+            });
+
+            return () => {
+                socket.emit('leave_project', project.id);
+                socket.disconnect();
+            };
         }
     }, [project?.id, page, search, eventType, timeRange]);
 
@@ -243,8 +266,8 @@ export default function ActivityLog() {
                                         key={p}
                                         onClick={() => setPage(p)}
                                         className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
                                             }`}
                                     >
                                         {p}

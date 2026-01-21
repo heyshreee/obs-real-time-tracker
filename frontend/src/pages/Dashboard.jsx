@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
-  const { user, loadUser } = useOutletContext();
+  const { user, loadUser, usageStats } = useOutletContext();
   const [projects, setProjects] = useState([]);
   const [stats, setStats] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -131,7 +131,7 @@ export default function Dashboard() {
   if (loading) return <Spinner />;
 
   const totalViewsUsed = stats?.reduce((acc, curr) => acc + curr.views, 0) || 0;
-  const viewLimit = user?.limits?.monthlyLimit || 10000;
+  const viewLimit = usageStats?.monthlyLimit || 1000;
   const viewPercentage = Math.min((totalViewsUsed / viewLimit) * 100, 100);
 
   const { realTimeVisitors, trafficData, sourceData, liveActivity, sparkline } = dashboardStats;

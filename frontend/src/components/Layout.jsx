@@ -28,10 +28,11 @@ export default function Layout() {
     const [pinnedProjects, setPinnedProjects] = useState([]);
     const [usageStats, setUsageStats] = useState({
         totalViews: 0,
-        monthlyLimit: 10000,
+        monthlyLimit: 1000,
         storageUsed: 0,
         storageLimit: 1024 * 1024 * 1024,
-        plan: 'free'
+        plan: 'free',
+        projectLimit: 5
     });
     const location = useLocation();
     const navigate = useNavigate();
@@ -103,6 +104,11 @@ export default function Layout() {
 
             setPinnedProjects(projects.filter(p => p.is_pinned));
             setUsageStats(usage);
+
+            // Sync user plan if it changed
+            if (usage.plan && user && usage.plan !== user.plan) {
+                setUser(prev => ({ ...prev, plan: usage.plan }));
+            }
         } catch (error) {
             console.error('Failed to load sidebar data', error);
         }
@@ -287,7 +293,7 @@ export default function Layout() {
                                 <div className="text-right hidden sm:block leading-tight">
                                     <div className="text-sm font-bold text-white">{user.email}</div>
                                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                                        {user.plan === 'pro' ? 'Enterprise Pro' : 'Free Plan'}
+                                        {user.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
                                     </div>
                                 </div>
                                 <div className="relative group">

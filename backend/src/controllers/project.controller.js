@@ -37,6 +37,20 @@ exports.createProject = async (req, res) => {
             return res.status(400).json({ error: 'Project with this name already exists' });
         }
 
+        // Validate allowed origins count against plan limit
+        if (allowedOrigins) {
+            const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
+            const usage = await usageService.calculateUsage(userId);
+            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+
+            if (originsArray.length > allowedOriginsLimit) {
+                return res.status(403).json({
+                    error: 'LIMIT_EXCEEDED',
+                    message: `Your ${usage.plan} plan allows only ${allowedOriginsLimit} allowed origin(s). Upgrade to Pro for unlimited origins.`
+                });
+            }
+        }
+
         const trackingId = 'trk_' + uuidv4().replace(/-/g, '').substring(0, 12);
 
         const { data: project, error } = await supabase
@@ -222,7 +236,22 @@ exports.updateProject = async (req, res) => {
             }
             updates.name = name;
         }
-        if (allowedOrigins !== undefined) updates.allowed_origins = allowedOrigins;
+
+        // Validate allowed origins count against plan limit
+        if (allowedOrigins !== undefined) {
+            const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
+            const usage = await usageService.calculateUsage(userId);
+            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+
+            if (originsArray.length > allowedOriginsLimit) {
+                return res.status(403).json({
+                    error: 'LIMIT_EXCEEDED',
+                    message: `Your ${usage.plan} plan allows only ${allowedOriginsLimit} allowed origin(s). Upgrade to Pro for unlimited origins.`
+                });
+            }
+            updates.allowed_origins = allowedOrigins;
+        }
+
         if (targetUrl !== undefined) updates.target_url = targetUrl;
         if (isActive !== undefined) updates.is_active = isActive;
         if (timezone) updates.timezone = timezone;

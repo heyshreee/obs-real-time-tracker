@@ -116,12 +116,12 @@ export default function Projects() {
 
     if (loading) return <Spinner />;
 
-    const projectLimit = user?.limits?.projectLimit || 10;
+    const projectLimit = usageStats?.projectLimit || 5;
     const projectsUsed = projects.length;
 
     // Calculate total monthly views across all projects
     const totalMonthlyViews = Object.values(stats).reduce((acc, curr) => acc + (curr?.current_month_views || 0), 0);
-    const viewLimit = user?.limits?.monthlyLimit || 10000;
+    const viewLimit = usageStats?.monthlyLimit || 1000;
 
 
     const filteredProjects = projects.filter(p =>
@@ -144,7 +144,7 @@ export default function Projects() {
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="px-3 py-1 bg-slate-800 text-slate-300 text-xs font-medium rounded-full border border-slate-700">
-                        Free Plan
+                        {user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : 'Free'} Plan
                     </span>
                     <div className="relative group/btn">
                         <button
@@ -442,7 +442,7 @@ export default function Projects() {
                             onClick={() => {
                                 setShowModal(false);
                                 setProjectName('');
-                                setAllowedOrigins('');
+                                setAllowwedOrigins('');
                             }}
                             className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                         >
