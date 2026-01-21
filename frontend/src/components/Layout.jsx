@@ -117,6 +117,7 @@ export default function Layout() {
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/dashboard/projects', label: 'Projects', icon: Folder },
+        { path: '/dashboard/activity', label: 'Activity Log', icon: Activity },
         { path: '/dashboard/api-key', label: 'API Keys', icon: Key },
         { path: '/dashboard/billing', label: 'Billing', icon: CreditCard },
     ];

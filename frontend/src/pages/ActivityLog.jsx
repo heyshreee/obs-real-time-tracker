@@ -9,25 +9,9 @@ import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import Spinner from '../components/Spinner';
 
-export default function ProjectActivity() {
+export default function ActivityLog() {
     const { idOrName } = useParams();
-    // const { project } = useOutletContext(); // This might fail if not in Layout context correctly or if context is different.
-    // ProjectActivity is rendered inside Layout -> PrivateRoute.
-    // But wait, App.jsx renders it as:
-    // <Route path="/dashboard/projects/:idOrName/activity" element={<PrivateRoute><ProjectActivity /></PrivateRoute>} />
-    // It is NOT inside the nested Route element={<Layout />}> ... </Route> block in App.jsx?
-    // Let's check App.jsx again.
-    // Line 50: It is OUTSIDE the Layout route wrapper.
-    // So useOutletContext() will NOT work if it expects Layout's context.
-    // However, the screenshot shows the sidebar.
-    // If it's outside Layout, it won't have the sidebar.
-    // The user wants it in the sidebar, so it should be part of the dashboard layout.
-    // I should move the route INSIDE the Layout wrapper in App.jsx.
-
-    // For now, I will write the component assuming I will fix the route in App.jsx next.
-    // I'll fetch project data if context is missing or just use idOrName.
-
-    const [project, setProject] = useState(null);
+    const { project } = useOutletContext();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -39,21 +23,14 @@ export default function ProjectActivity() {
     const { showToast } = useToast();
 
     useEffect(() => {
-        loadData();
-    }, [idOrName, page, search, eventType, timeRange]);
+        if (project?.id) {
+            loadLogs();
+        }
+    }, [project?.id, page, search, eventType, timeRange]);
 
-    const loadData = async () => {
+    const loadLogs = async () => {
         setLoading(true);
         try {
-            // 1. Get Project ID if we only have name
-            let projectId = project?.id;
-            if (!projectId) {
-                const p = await apiRequest(`/projects/${idOrName}`);
-                setProject(p);
-                projectId = p.id;
-            }
-
-            // 2. Get Logs
             const query = new URLSearchParams({
                 page,
                 limit: 10,
@@ -62,7 +39,7 @@ export default function ProjectActivity() {
                 days: timeRange
             });
 
-            const data = await apiRequest(`/activity/${projectId}?${query.toString()}`);
+            const data = await apiRequest(`/activity/${project.id}?${query.toString()}`);
             setLogs(data.logs);
             setTotalPages(data.totalPages);
             setTotalLogs(data.total);
@@ -114,7 +91,7 @@ export default function ProjectActivity() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `activity-log-${project?.name || 'project'}-${new Date().toISOString()}.csv`;
+        a.download = `activity-log-${project.name}-${new Date().toISOString()}.csv`;
         a.click();
     };
 
@@ -122,9 +99,7 @@ export default function ProjectActivity() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-white mb-2">Activity Log</h1>
-                <p className="text-slate-400">
-                    {idOrName ? `Monitor events for ${project?.name || 'project'}` : 'Monitor all events across all your projects'}
-                </p>
+                <p className="text-slate-400">Monitor all events and security changes across your project.</p>
             </div>
 
             {/* Controls */}
@@ -180,7 +155,6 @@ export default function ProjectActivity() {
                         <thead>
                             <tr className="border-b border-slate-800 bg-slate-950/50 text-xs font-medium text-slate-400 uppercase tracking-wider">
                                 <th className="px-6 py-4">Timestamp</th>
-                                {!idOrName && <th className="px-6 py-4">Project</th>}
                                 <th className="px-6 py-4">Event Type</th>
                                 <th className="px-6 py-4">User</th>
                                 <th className="px-6 py-4">Details</th>
@@ -213,13 +187,6 @@ export default function ProjectActivity() {
                                                 {new Date(log.created_at).toLocaleTimeString()}
                                             </div>
                                         </td>
-                                        {!idOrName && (
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm text-white font-medium">
-                                                    {log.project?.name || 'Unknown'}
-                                                </div>
-                                            </td>
-                                        )}
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 rounded-lg bg-slate-800 border border-slate-700">
@@ -269,14 +236,15 @@ export default function ProjectActivity() {
                         </button>
                         <div className="flex items-center gap-1">
                             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                // Simple logic to show first 5 pages or sliding window could be better but this is MVP
                                 const p = i + 1;
                                 return (
                                     <button
                                         key={p}
                                         onClick={() => setPage(p)}
                                         className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === p
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
                                             }`}
                                     >
                                         {p}

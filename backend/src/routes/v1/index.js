@@ -25,5 +25,6 @@ router.use('/track', trackRoutes);
 router.use('/usage', usageRoutes);
 
 router.use('/notifications', require('./notification.routes'));
+router.use('/activity', require('./activity.routes'));
 
 module.exports = router;

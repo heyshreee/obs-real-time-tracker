@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
 const NotificationService = require('../services/notification.service');
+const ActivityLogService = require('../services/activity.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -236,6 +237,25 @@ exports.updateProject = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Log Activity
+        if (isActive !== undefined) {
+            await ActivityLogService.log(
+                projectId,
+                userId,
+                'Project Disabled',
+                `Manual suspension by project owner. Reason: User action`,
+                isActive ? 'success' : 'warning'
+            );
+        } else if (Object.keys(updates).length > 0) {
+            await ActivityLogService.log(
+                projectId,
+                userId,
+                'Settings Updated',
+                'Project settings were updated',
+                'success'
+            );
+        }
 
         // Notify user
         await NotificationService.create(
@@ -549,6 +569,17 @@ exports.togglePin = async (req, res) => {
 
         if (fetchError || !project) {
             return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Log general settings update if not just status change
+        if (Object.keys(updates).length > 0 && (isActive === undefined || Object.keys(updates).length > 1)) {
+            await ActivityLogService.log(
+                project.id,
+                req.user.id,
+                'Settings Updated',
+                'Project settings were updated',
+                'success'
+            );
         }
 
         const { data: updatedProject, error: updateError } = await supabase
