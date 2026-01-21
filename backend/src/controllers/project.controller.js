@@ -254,6 +254,16 @@ exports.updateProject = async (req, res) => {
             );
         }
 
+        if (isActive !== undefined) {
+            const status = isActive ? 'enabled' : 'disabled';
+            await NotificationService.create(
+                userId,
+                'Project Status Changed',
+                `Project "${updatedProject.name}" has been ${status}.`,
+                isActive ? 'success' : 'warning'
+            );
+        }
+
         res.json(updatedProject);
     } catch (error) {
         console.error('Update project error:', error);

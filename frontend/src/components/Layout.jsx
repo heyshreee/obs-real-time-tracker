@@ -64,6 +64,10 @@ export default function Layout() {
                     storageLimit: data.storageLimit
                 }));
             });
+
+            socketRef.current.on('new_notification', (data) => {
+                window.dispatchEvent(new CustomEvent('notification_received', { detail: data }));
+            });
         }
 
         const interval = setInterval(() => loadSidebarData(), 5000); // Poll every 5s

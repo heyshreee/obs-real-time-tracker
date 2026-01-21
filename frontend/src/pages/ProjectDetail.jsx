@@ -209,6 +209,25 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleToggleActive = async () => {
+    const newStatus = !isActive;
+    setIsActive(newStatus); // Optimistic update
+
+    try {
+      await apiRequest(`/projects/${project.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+      showToast(`Project ${newStatus ? 'enabled' : 'disabled'} successfully`, 'success');
+
+      // Update local project object as well
+      setProject(prev => ({ ...prev, is_active: newStatus }));
+    } catch (err) {
+      setIsActive(!newStatus); // Revert on error
+      showToast('Failed to update project status', 'error');
+    }
+  };
+
   const handleViewAllPages = async () => {
     setShowPagesModal(true);
     setLoadingModalData(true);
@@ -777,7 +796,7 @@ export default function ProjectDetail() {
                   <p className="text-sm text-slate-400">Stop tracking new events. Historical data will be preserved.</p>
                 </div>
                 <button
-                  onClick={() => setIsActive(!isActive)}
+                  onClick={handleToggleActive}
                   className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
                 >
                   {isActive ? 'Disable Project' : 'Enable Project'}

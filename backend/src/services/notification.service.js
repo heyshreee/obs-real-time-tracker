@@ -20,6 +20,11 @@ class NotificationService {
                 .single();
 
             if (error) throw error;
+
+            if (global.io) {
+                global.io.to(`user_${userId}`).emit('new_notification', data);
+            }
+
             return data;
         } catch (error) {
             console.error('Error creating notification:', error.message);
