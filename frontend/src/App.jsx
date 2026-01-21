@@ -106,6 +106,14 @@ function App() {
                                             </PrivateRoute>
                                         }
                                     />
+                                    <Route
+                                        path="/dashboard/activity"
+                                        element={
+                                            <PrivateRoute>
+                                                <ProjectActivity />
+                                            </PrivateRoute>
+                                        }
+                                    />
                                 </Route>
 
                                 <Route path="/" element={<Landing />} />

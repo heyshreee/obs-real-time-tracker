@@ -178,8 +178,8 @@ export default function Landing() {
                             {
                                 icon: <Activity className="h-6 w-6 text-blue-400" />,
                                 color: "bg-blue-500/10",
-                                title: "Real-time Performance Tracking",
-                                desc: "Monitor stream health, viewer latency, and engagement metrics as they happen. Never miss a drop in quality."
+                                title: "Real-time Activity Logs",
+                                desc: "Monitor every visitor action as it happens. Watch your traffic grow live with instant updates."
                             },
                             {
                                 icon: <Layout className="h-6 w-6 text-purple-400" />,
@@ -300,6 +300,9 @@ export default function Landing() {
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> AI-Powered Insights
+                                </li>
+                                <li className="flex items-center gap-3 text-white text-sm">
+                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> Email Notifications

@@ -145,6 +145,11 @@ export default function Billing() {
                             <td className="px-6 py-4 text-blue-400 font-bold">100</td>
                         </tr>
                         <tr>
+                            <td className="px-6 py-4 font-medium text-white">Real-time Logs</td>
+                            <td className="px-6 py-4">Manual Refresh</td>
+                            <td className="px-6 py-4 text-blue-400 font-bold">Live Streaming</td>
+                        </tr>
+                        <tr>
                             <td className="px-6 py-4 font-medium text-white">Support</td>
                             <td className="px-6 py-4">Community</td>
                             <td className="px-6 py-4 text-blue-400 font-bold">Priority</td>

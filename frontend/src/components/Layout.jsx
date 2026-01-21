@@ -37,6 +37,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const { showToast } = useToast();
 
+    const [socket, setSocket] = useState(null);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -49,6 +50,8 @@ export default function Layout() {
                 withCredentials: true,
                 transports: ['websocket', 'polling']
             });
+            window.socket = socketRef.current;
+            setSocket(socketRef.current);
 
             socketRef.current.on('connect', () => {
                 if (user) {
@@ -314,7 +317,7 @@ export default function Layout() {
 
                 {/* Page Content */}
                 < main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" >
-                    <Outlet context={{ user, loadUser, loadSidebarData, usageStats }} />
+                    <Outlet context={{ user, loadUser, loadSidebarData, usageStats, socket }} />
                 </main >
             </div >
         </div >

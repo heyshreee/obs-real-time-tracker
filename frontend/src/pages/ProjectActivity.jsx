@@ -3,7 +3,7 @@ import { useParams, useOutletContext } from 'react-router-dom';
 import {
     Search, Download, Filter, ChevronLeft, ChevronRight,
     Key, Shield, AlertTriangle, Settings, Lock, Activity,
-    CheckCircle, XCircle, AlertCircle
+    CheckCircle, XCircle, AlertCircle, RefreshCw, Zap
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -36,18 +36,48 @@ export default function ProjectActivity() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalLogs, setTotalLogs] = useState(0);
+    const [isLive, setIsLive] = useState(false);
     const { showToast } = useToast();
+    const { socket, user } = useOutletContext(); // Get user to check plan
 
     useEffect(() => {
         loadData();
-    }, [idOrName, page, search, eventType, timeRange]);
+
+        // Socket listener
+        const handleNewActivity = (newLog) => {
+            if (!isLive) return; // Only update if live mode is on
+
+            // If viewing specific project, filter
+            if (idOrName) {
+                if (project && (newLog.project_id === project.id)) {
+                    setLogs(prev => [newLog, ...prev]);
+                    setTotalLogs(prev => prev + 1);
+                }
+            } else {
+                // Global view: show all
+                setLogs(prev => [newLog, ...prev]);
+                setTotalLogs(prev => prev + 1);
+            }
+        };
+
+        if (socket && isLive) {
+            socket.on('activity_new', handleNewActivity);
+        }
+
+        return () => {
+            if (socket) {
+                socket.off('activity_new', handleNewActivity);
+            }
+        };
+    }, [idOrName, project, page, search, eventType, timeRange, socket, isLive]);
 
     const loadData = async () => {
         setLoading(true);
         try {
             // 1. Get Project ID if we only have name
+            // 1. Get Project ID if we only have name
             let projectId = project?.id;
-            if (!projectId) {
+            if (idOrName && !projectId) {
                 const p = await apiRequest(`/projects/${idOrName}`);
                 setProject(p);
                 projectId = p.id;
@@ -62,7 +92,8 @@ export default function ProjectActivity() {
                 days: timeRange
             });
 
-            const data = await apiRequest(`/activity/${projectId}?${query.toString()}`);
+            const endpoint = projectId ? `/activity/${projectId}` : '/activity';
+            const data = await apiRequest(`${endpoint}?${query.toString()}`);
             setLogs(data.logs);
             setTotalPages(data.totalPages);
             setTotalLogs(data.total);
@@ -169,6 +200,36 @@ export default function ProjectActivity() {
                     >
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline">Export CSV</span>
+                    </button>
+
+                    <div className="h-8 w-px bg-slate-800 mx-1"></div>
+
+                    <button
+                        onClick={() => loadData()}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+                        title="Refresh Logs"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            if (user?.plan === 'pro') {
+                                setIsLive(!isLive);
+                                if (!isLive) showToast('Live mode enabled', 'success');
+                            } else {
+                                showToast('Live logs are available on Pro plan', 'info');
+                            }
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${isLive
+                            ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
+                            }`}
+                        title={user?.plan === 'pro' ? 'Toggle Live Mode' : 'Upgrade to Pro for Live Mode'}
+                    >
+                        <Zap className={`h-4 w-4 ${isLive ? 'fill-current' : ''}`} />
+                        <span className="hidden sm:inline font-medium">{isLive ? 'Live' : 'Go Live'}</span>
+                        {user?.plan !== 'pro' && <span className="text-[10px] bg-blue-600 text-white px-1.5 rounded ml-1">PRO</span>}
                     </button>
                 </div>
             </div>

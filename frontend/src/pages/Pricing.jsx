@@ -77,6 +77,9 @@ export default function Pricing() {
                                     <Check className="h-4 w-4 text-white" /> AI-Powered Insights
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
+                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
+                                </li>
+                                <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> Email Notifications
                                 </li>
                             </ul>

@@ -182,7 +182,7 @@ export default function Dashboard() {
 
           {/* Sparkline */}
           <div className="h-16 mt-auto -mx-2 -mb-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={sparkline || []}>
                 <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                   {(sparkline || []).map((entry, index) => (
@@ -217,7 +217,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={trafficData}>
                 <defs>
                   <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
@@ -322,7 +322,7 @@ export default function Dashboard() {
         {/* 5. Monthly Usage */}
         <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center h-full">
           <div className="relative w-48 h-48 mb-6">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={pieData}
