@@ -114,11 +114,7 @@ export default function Projects() {
         }
     };
 
-    if (loading) return (
-        <div className="flex items-center justify-center min-h-[400px]">
-            <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-        </div>
-    );
+    if (loading) return <Spinner />;
 
     const projectLimit = user?.limits?.projectLimit || 10;
     const projectsUsed = projects.length;

@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { apiRequest } from '../utils/api';
 import TrafficTrendsChart from '../components/TrafficTrendsChart';
+import Spinner from '../components/Spinner';
 
 export default function ShareReport() {
     const { shareToken } = useParams();
@@ -33,11 +34,7 @@ export default function ShareReport() {
     }, [shareToken]);
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-            </div>
-        );
+        return <Spinner />;
     }
 
     if (error) {

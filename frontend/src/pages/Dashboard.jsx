@@ -128,11 +128,7 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <Spinner fullScreen={false} />
-    </div>
-  );
+  if (loading) return <Spinner />;
 
   const totalViewsUsed = stats?.reduce((acc, curr) => acc + curr.views, 0) || 0;
   const viewLimit = user?.limits?.monthlyLimit || 10000;

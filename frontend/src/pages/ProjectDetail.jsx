@@ -4,7 +4,7 @@ import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
   Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
   Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database, RefreshCw,
-  Shield, AlertTriangle, CheckCircle, Lock
+  Shield, AlertTriangle, CheckCircle, Lock, Plus
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -17,6 +17,7 @@ import CopyButton from '../components/CopyButton';
 import Modal from '../components/Modal';
 import TrafficTrendsChart from '../components/TrafficTrendsChart';
 import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 import { io } from 'socket.io-client';
 
 const API_URL = getApiUrl();
@@ -45,7 +46,7 @@ export default function ProjectDetail() {
   // Settings State
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [allowedOrigins, setAllowedOrigins] = useState('');
+  const [allowedOrigins, setAllowedOrigins] = useState([]);
   const [projectName, setProjectName] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -116,7 +117,7 @@ export default function ProjectDetail() {
       ]);
       setProject(projectData);
       setProjectName(projectData.name);
-      setAllowedOrigins(projectData.allowed_origins || '');
+      setAllowedOrigins(projectData.allowed_origins ? projectData.allowed_origins.split(',').map(o => o.trim()) : []);
       setTargetUrl(projectData.target_url || '');
       setIsActive(projectData.is_active !== false);
       setShareToken(projectData.share_token || '');
@@ -183,7 +184,7 @@ export default function ProjectDetail() {
 
       const body = {
         name: projectName,
-        allowedOrigins,
+        allowedOrigins: allowedOrigins.filter(o => o.trim()).join(','),
         targetUrl,
         isActive,
         timezone,
@@ -221,11 +222,7 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-    </div>
-  );
+  if (loading) return <Spinner />;
   if (!project) return <div className="text-red-400">Project not found</div>;
 
   const trackingId = project.tracking_id;
@@ -618,17 +615,42 @@ export default function ProjectDetail() {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
-                <div className="relative">
-                  <textarea
-                    value={allowedOrigins}
-                    onChange={(e) => setAllowedOrigins(e.target.value)}
-                    className="w-full h-32 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
-                    placeholder={`https://example.com\nhttps://app.example.com`}
-                  />
+                <div className="space-y-3">
+                  {allowedOrigins.map((origin, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={origin}
+                        onChange={(e) => {
+                          const newOrigins = [...allowedOrigins];
+                          newOrigins[index] = e.target.value;
+                          setAllowedOrigins(newOrigins);
+                        }}
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                        placeholder="https://example.com"
+                      />
+                      <button
+                        onClick={() => {
+                          const newOrigins = allowedOrigins.filter((_, i) => i !== index);
+                          setAllowedOrigins(newOrigins);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setAllowedOrigins([...allowedOrigins, ''])}
+                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded hover:bg-blue-500/10 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Allowed Origin
+                  </button>
                 </div>
-                <div className="flex gap-2 mt-2 text-xs text-slate-500">
+                <div className="flex gap-2 mt-4 text-xs text-slate-500">
                   <div className="mt-0.5"><AlertTriangle className="h-3 w-3" /></div>
-                  <p>Enter the domains that are authorized to send tracking data to this project. Only requests from these origins will be accepted. Use one domain per line or comma-separated.</p>
+                  <p>Enter the domains that are authorized to send tracking data to this project. Only requests from these origins will be accepted.</p>
                 </div>
               </div>
 
