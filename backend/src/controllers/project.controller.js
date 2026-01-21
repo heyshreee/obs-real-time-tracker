@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
+const NotificationService = require('../services/notification.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -13,6 +14,15 @@ exports.createProject = async (req, res) => {
 
         if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
             return res.status(400).json({ error: 'Project name can only contain letters, numbers, underscores, and hyphens' });
+        }
+
+        // Check limits before creating project
+        const limitCheck = await usageService.checkLimit(userId, 'create_project');
+        if (!limitCheck.canTrack) {
+            return res.status(403).json({
+                error: 'LIMIT_EXCEEDED',
+                message: limitCheck.reason
+            });
         }
 
         // Check if project with same name exists
@@ -46,6 +56,30 @@ exports.createProject = async (req, res) => {
             project_id: project.id,
             count: 0
         });
+
+        // Notify user
+        await NotificationService.create(
+            userId,
+            'Project Created',
+            `Project "${project.name}" has been successfully created.`,
+            'success'
+        );
+
+        // Check if limit reached after creation
+        const { count } = await supabase
+            .from('projects')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        const usage = await usageService.calculateUsage(userId);
+        if (count >= usage.projectLimit) {
+            await NotificationService.create(
+                userId,
+                'Plan Limit Reached',
+                `You have reached the maximum number of projects (${usage.projectLimit}) for your plan. Upgrade to create more.`,
+                'warning'
+            );
+        }
 
         res.status(201).json(project);
     } catch (error) {
@@ -120,6 +154,20 @@ exports.deleteProject = async (req, res) => {
             projectId = project.id;
         }
 
+        // Manual Cascade Delete (in case DB constraints are missing)
+        // 1. Delete Page Views
+        await supabase.from('page_views').delete().eq('project_id', projectId);
+
+        // 2. Delete Visitors
+        await supabase.from('visitors').delete().eq('project_id', projectId);
+
+        // 3. Delete Counters
+        await supabase.from('counters').delete().eq('project_id', projectId);
+
+        // 4. Delete Usages
+        await supabase.from('usages').delete().eq('project_id', projectId);
+
+        // 5. Delete Project
         const { error } = await supabase
             .from('projects')
             .delete()
@@ -131,6 +179,14 @@ exports.deleteProject = async (req, res) => {
         // Audit Log
         const { logAction } = require('../services/audit.service');
         await logAction(userId, 'PROJECT_DELETE', { projectId });
+
+        // Notify user
+        await NotificationService.create(
+            userId,
+            'Project Deleted',
+            `Project has been successfully deleted.`,
+            'system'
+        );
 
         res.json({ success: true });
     } catch (error) {
@@ -180,6 +236,33 @@ exports.updateProject = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Notify user
+        await NotificationService.create(
+            userId,
+            'Project Updated',
+            `Settings for project "${updatedProject.name}" have been updated.`,
+            'success'
+        );
+
+        if (allowedOrigins !== undefined) {
+            await NotificationService.create(
+                userId,
+                'Security Update',
+                `Allowed origins for project "${updatedProject.name}" have been modified.`,
+                'security'
+            );
+        }
+
+        if (isActive !== undefined) {
+            const status = isActive ? 'enabled' : 'disabled';
+            await NotificationService.create(
+                userId,
+                'Project Status Changed',
+                `Project "${updatedProject.name}" has been ${status}.`,
+                isActive ? 'success' : 'warning'
+            );
+        }
 
         res.json(updatedProject);
     } catch (error) {
@@ -358,6 +441,14 @@ exports.regenerateShareToken = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Notify user
+        await NotificationService.create(
+            userId,
+            'Report Generated',
+            `A new public report link has been generated for project "${updatedProject.name || 'Unknown'}".`,
+            'activity'
+        );
 
         res.json({ share_token: updatedProject.share_token });
     } catch (error) {

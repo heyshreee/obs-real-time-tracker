@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Plus, ArrowRight, Loader2, Globe, ExternalLink, Code } from 'lucide-react';
+import { Plus, Globe, ExternalLink, Code, Activity, ArrowUpRight } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
@@ -11,7 +10,6 @@ import {
   AreaChart,
   Area,
   XAxis,
-  YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
@@ -46,21 +44,27 @@ export default function Dashboard() {
     loadData();
 
     // Socket.io connection
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true
-    });
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    let socket;
 
-    socket.on('visitor_update', () => {
-      loadData(false);
-    });
+    if (!apiUrl.includes('vercel.app')) {
+      socket = io(apiUrl, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    const interval = setInterval(() => loadData(false), 1000); // 1s polling
+      socket.on('visitor_update', () => {
+        loadData(false);
+      });
+    }
+
+    const interval = setInterval(() => loadData(false), 5000); // Poll every 5s
 
     return () => {
       clearInterval(interval);
-      socket.disconnect();
+      if (socket) socket.disconnect();
     };
-  }, [user?.id, timeRange]); // Re-fetch when timeRange changes
+  }, [user?.id, timeRange]);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -124,11 +128,7 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-    </div>
-  );
+  if (loading) return <Spinner />;
 
   const totalViewsUsed = stats?.reduce((acc, curr) => acc + curr.views, 0) || 0;
   const viewLimit = user?.limits?.monthlyLimit || 10000;
@@ -143,44 +143,45 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Overview</h1>
+          <h1 className="text-2xl font-bold text-white">Insight Overview</h1>
           <p className="text-slate-400">Welcome back, {user?.name || 'Administrator'}</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Notification bell could go here */}
         </div>
       </div>
 
+      {/* Top Row: Real-time & Traffic Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 1. Real-time Visitors */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden h-full min-h-[300px]">
           <div className="flex justify-between items-start z-10">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Real-time Visitors</h3>
-                <div className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                </div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Real-time Visitors</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">LIVE TRACKER</span>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  LIVE TRACKER
+                </span>
               </div>
             </div>
-            <Globe className="h-5 w-5 text-slate-600" />
+            <Activity className="h-5 w-5 text-blue-500" />
           </div>
 
           <div className="mt-8 z-10">
-            <div className="flex items-end gap-3">
-              <span className="text-5xl font-bold text-white">{realTimeVisitors.toLocaleString()}</span>
-              <span className="text-green-400 font-medium mb-2">Active</span>
+            <div className="flex items-baseline gap-3">
+              <span className="text-6xl font-bold text-white tracking-tighter">{realTimeVisitors.toLocaleString()}</span>
+              {/* <span className="text-green-400 font-medium text-sm">~12%</span> */}
             </div>
           </div>
 
-          {/* Mini Bar Chart for visual effect */}
-          <div className="h-16 mt-4 -mx-2">
+          {/* Sparkline */}
+          <div className="h-16 mt-auto -mx-2 -mb-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sparkline || []}>
                 <Bar dataKey="value" radius={[2, 2, 0, 0]}>
@@ -194,7 +195,7 @@ export default function Dashboard() {
         </div>
 
         {/* 2. Traffic Trends */}
-        <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+        <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 h-full min-h-[300px] flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-lg font-bold text-white">Traffic Trends</h3>
@@ -205,7 +206,9 @@ export default function Dashboard() {
                 <button
                   key={range}
                   onClick={() => setTimeRange(range)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeRange === range ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === range
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                    : 'text-slate-400 hover:text-white'
                     }`}
                 >
                   {range.toUpperCase()}
@@ -213,12 +216,12 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div className="h-[200px] w-full">
+          <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trafficData}>
                 <defs>
                   <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4} />
                     <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -226,93 +229,113 @@ export default function Dashboard() {
                 <XAxis
                   dataKey="name"
                   stroke="#64748B"
-                  fontSize={12}
+                  fontSize={10}
                   tickLine={false}
                   axisLine={false}
                   minTickGap={30}
+                  tickFormatter={(value) => value.toUpperCase()}
+                  dy={10}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', color: '#F8FAFC' }}
+                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#1E293B', color: '#F8FAFC', borderRadius: '8px' }}
                   itemStyle={{ color: '#F8FAFC' }}
+                  cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '4 4' }}
                 />
-                <Area type="monotone" dataKey="views" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorViews)" />
+                <Area
+                  type="monotone"
+                  dataKey="views"
+                  stroke="#3B82F6"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#colorViews)"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
+      {/* Bottom Row: Referrals, Activity, Usage */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 3. Top Referral Sources */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-6">Top Referral Sources</h3>
-          <div className="space-y-6">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 h-full flex flex-col">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Top Referral Sources</h3>
+          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
             {sourceData.map((source) => (
               <div key={source.name}>
                 <div className="flex justify-between text-sm mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: source.color }}></span>
-                    <span className="text-white font-medium">{source.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: source.color }}></span>
+                    <span className="text-white font-medium truncate">{source.name}</span>
                   </div>
-                  <span className="text-slate-400">{source.value.toLocaleString()}</span>
+                  <span className="text-slate-400 font-mono">{source.value.toLocaleString()}</span>
                 </div>
                 <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full"
-                    style={{ width: `${(source.value / 5000) * 100}%`, backgroundColor: source.color }}
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${(source.value / (sourceData[0]?.value || 1)) * 100}%`, backgroundColor: source.color }}
                   ></div>
                 </div>
               </div>
             ))}
+            {sourceData.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                <p>No referral data yet</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 4. Live Activity */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 h-full flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Live Activity</h3>
-            <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">Streaming</span>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Activity</h3>
+            <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase border border-blue-500/20">Streaming</span>
           </div>
-          <div className="space-y-6 relative">
+          <div className="space-y-6 relative flex-1 overflow-hidden">
             {/* Vertical line */}
-            <div className="absolute left-1.5 top-2 bottom-2 w-px bg-slate-800"></div>
+            <div className="absolute left-[5.5px] top-2 bottom-2 w-px bg-slate-800"></div>
 
-            {liveActivity.map((activity) => (
-              <div key={activity.id} className="flex gap-4 relative">
-                <div className={`w-3 h-3 rounded-full mt-1.5 border-2 border-slate-900 z-10 flex-shrink-0 ${activity.type === 'session' ? 'bg-blue-500' :
-                  activity.type === 'view' ? 'bg-slate-500' : 'bg-purple-500'
+            {liveActivity.slice(0, 5).map((activity) => (
+              <div key={activity.id} className="flex gap-4 relative group">
+                <div className={`w-3 h-3 rounded-full mt-1.5 border-2 border-slate-900 z-10 flex-shrink-0 transition-colors ${activity.type === 'session' ? 'bg-blue-500 group-hover:bg-blue-400' :
+                  activity.type === 'view' ? 'bg-slate-500 group-hover:bg-slate-400' : 'bg-purple-500 group-hover:bg-purple-400'
                   }`}></div>
-                <div>
-                  <p className="text-sm text-white">
-                    <span className="font-medium text-blue-400">{activity.ip}</span> visited <span className="font-medium text-white">{activity.path}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-white truncate">
+                    <span className="text-slate-400">New {activity.type} from</span> <span className="font-medium text-white">{activity.location || 'Unknown Location'}</span>
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    from <span className="text-slate-300">{activity.title || 'Unknown Page'}</span>, <span className="text-slate-300 capitalize">{activity.device || 'Desktop'}</span> on <span className="text-slate-300">{activity.ip}</span>
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    {new Date(activity.timestamp).toLocaleTimeString()}
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    {new Date(activity.timestamp).toLocaleTimeString()} • <span className="text-blue-400">{activity.path}</span>
                   </p>
                 </div>
               </div>
             ))}
+            {liveActivity.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                <p>Waiting for activity...</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 5. Monthly Usage */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-          <div className="relative w-40 h-40 mb-4">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center h-full">
+          <div className="relative w-48 h-48 mb-6">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={75}
+                  innerRadius={70}
+                  outerRadius={90}
                   startAngle={90}
                   endAngle={-270}
                   dataKey="value"
                   stroke="none"
+                  cornerRadius={4}
+                  paddingAngle={2}
                 >
                   <Cell key="used" fill="#3B82F6" />
                   <Cell key="remaining" fill="#1E293B" />
@@ -320,31 +343,31 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold text-white">{Math.round(viewPercentage)}%</span>
-              <span className="text-xs text-slate-500 uppercase">Limit</span>
+              <span className="text-4xl font-bold text-white">{Math.round(viewPercentage)}%</span>
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-wider mt-1">Limit</span>
             </div>
           </div>
-          <h3 className="text-white font-medium mb-1">Monthly Usage</h3>
+          <h3 className="text-white font-bold text-lg mb-1">Monthly Usage</h3>
           <p className="text-sm text-slate-400 mb-4">{totalViewsUsed.toLocaleString()} / {viewLimit.toLocaleString()} views</p>
-          <Link to="/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1">
-            Upgrade Capacity <ExternalLink className="h-3 w-3" />
+          <Link to="/dashboard/billing" className="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1 font-medium transition-colors">
+            Upgrade Capacity <ArrowUpRight className="h-3 w-3" />
           </Link>
         </div>
       </div>
 
       {/* 6. Quick Actions */}
-      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
-          <h3 className="text-lg font-bold text-white">Quick Actions</h3>
+          <h3 className="text-xl font-bold text-white mb-1">Quick Actions</h3>
           <p className="text-sm text-slate-400">Deploy tracker script or manage your domains</p>
         </div>
         <div className="flex gap-4">
-          <button className="px-6 py-3 bg-white text-slate-900 rounded-lg font-bold hover:bg-slate-100 transition-colors flex items-center gap-2">
+          <button className="px-6 py-3 bg-white text-slate-900 rounded-xl font-bold hover:bg-slate-100 transition-all shadow-lg shadow-white/5 flex items-center gap-2">
             <Code className="h-4 w-4" /> Get Tracker Script
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-500 transition-colors flex items-center gap-2"
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
           >
             <Plus className="h-4 w-4" /> Add New Domain
           </button>
@@ -390,7 +413,7 @@ export default function Dashboard() {
               disabled={creating}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+              {creating && <Spinner fullScreen={false} className="h-4 w-4" />}
               {creating ? 'Creating...' : 'Create'}
             </button>
           </div>

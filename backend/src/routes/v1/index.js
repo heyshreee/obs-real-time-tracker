@@ -24,4 +24,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/track', trackRoutes);
 router.use('/usage', usageRoutes);
 
+router.use('/notifications', require('./notification.routes'));
+
 module.exports = router;

@@ -11,15 +11,15 @@ import {
     Loader2,
     Activity,
     Key,
-    Bell,
     ChevronDown,
     Globe
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import { io } from 'socket.io-client';
+import Notifications from './Notifications';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000')).replace(/\/$/, '');
 
 export default function Layout() {
     const [user, setUser] = useState(null);
@@ -43,27 +43,34 @@ export default function Layout() {
         loadUser();
         loadSidebarData();
 
-        // Socket connection
-        socketRef.current = io(API_URL, {
-            withCredentials: true
-        });
+        // Socket connection (Skip on Vercel)
+        if (!API_URL.includes('vercel.app')) {
+            socketRef.current = io(API_URL, {
+                withCredentials: true,
+                transports: ['websocket', 'polling']
+            });
 
-        socketRef.current.on('connect', () => {
-            if (user) {
-                socketRef.current.emit('join', `user_${user.id}`);
-            }
-        });
+            socketRef.current.on('connect', () => {
+                if (user) {
+                    socketRef.current.emit('join', `user_${user.id}`);
+                }
+            });
 
-        socketRef.current.on('usage_update', (data) => {
-            setUsageStats(prev => ({
-                ...prev,
-                totalViews: data.totalViews,
-                storageUsed: data.storageUsed,
-                storageLimit: data.storageLimit
-            }));
-        });
+            socketRef.current.on('usage_update', (data) => {
+                setUsageStats(prev => ({
+                    ...prev,
+                    totalViews: data.totalViews,
+                    storageUsed: data.storageUsed,
+                    storageLimit: data.storageLimit
+                }));
+            });
 
-        const interval = setInterval(() => loadSidebarData(), 1000);
+            socketRef.current.on('new_notification', (data) => {
+                window.dispatchEvent(new CustomEvent('notification_received', { detail: data }));
+            });
+        }
+
+        const interval = setInterval(() => loadSidebarData(), 5000); // Poll every 5s
 
         return () => {
             clearInterval(interval);
@@ -109,9 +116,9 @@ export default function Layout() {
 
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/projects', label: 'Projects', icon: Folder },
-        { path: '/api-keys', label: 'API Keys', icon: Key },
-        { path: '/billing', label: 'Billing', icon: CreditCard },
+        { path: '/dashboard/projects', label: 'Projects', icon: Folder },
+        { path: '/dashboard/api-key', label: 'API Keys', icon: Key },
+        { path: '/dashboard/billing', label: 'Billing', icon: CreditCard },
     ];
 
     if (loading) {
@@ -182,7 +189,7 @@ export default function Layout() {
                             pinnedProjects.map((project) => (
                                 <Link
                                     key={project.id}
-                                    to={`/projects/${encodeURIComponent(project.name)}`}
+                                    to={`/dashboard/projects/${encodeURIComponent(project.name)}`}
                                     className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-800/50 cursor-pointer group transition-colors"
                                 >
                                     <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors truncate">{project.name}</span>
@@ -218,11 +225,11 @@ export default function Layout() {
                                 <span className="text-[10px] font-semibold text-slate-400 uppercase">Storage Used ({usageStats.plan})</span>
                                 <span className="text-[10px] font-bold text-white">
                                     {usageStats.storageUsed < 1024 * 1024
-                                        ? `${(usageStats.storageUsed / 1024).toFixed(1)} KB`
+                                        ? `${(usageStats.storageUsed / 1024).toFixed(2)} KB`
                                         : usageStats.storageUsed < 1024 * 1024 * 1024
-                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(1)} MB`
+                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(2)} MB`
                                             : `${(usageStats.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
-                                    }
+                                    } <span className="text-slate-500 font-normal">/ {usageStats.storageLimit < 1024 * 1024 * 1024 ? `${(usageStats.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(usageStats.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</span>
                                 </span>
                             </div>
                             <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
@@ -233,7 +240,7 @@ export default function Layout() {
                             </div>
                         </div>
 
-                        <Link to="/billing" className="block w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20 text-center">
+                        <Link to="/dashboard/billing" className="block w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20 text-center">
                             Upgrade Plan
                         </Link>
                     </div>
@@ -254,6 +261,7 @@ export default function Layout() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Topbar */}
+                {/* Topbar */}
                 <header className="h-16 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
                     <div className="flex items-center gap-4">
                         <button
@@ -266,10 +274,7 @@ export default function Layout() {
 
                     <div className="flex items-center gap-6">
                         {/* Notifications */}
-                        <button className="relative p-2 text-slate-400 hover:text-white transition-colors">
-                            <Bell className="h-5 w-5" />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-950"></span>
-                        </button>
+                        <Notifications />
 
                         <div className="h-6 w-px bg-slate-800"></div>
 
@@ -289,8 +294,8 @@ export default function Layout() {
                                     {/* Dropdown Menu */}
                                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top-right z-50">
                                         <div className="py-1">
-                                            <Link to="/profile" className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">Profile Settings</Link>
-                                            <Link to="/billing" className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">Billing</Link>
+                                            <Link to="/dashboard/profile" className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">Profile Settings</Link>
+                                            <Link to="/dashboard/billing" className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">Billing</Link>
                                             <div className="border-t border-slate-800 my-1"></div>
                                             <button
                                                 onClick={handleLogout}
@@ -307,10 +312,10 @@ export default function Layout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+                < main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" >
                     <Outlet context={{ user, loadUser, loadSidebarData, usageStats }} />
-                </main>
-            </div>
-        </div>
+                </main >
+            </div >
+        </div >
     );
 }

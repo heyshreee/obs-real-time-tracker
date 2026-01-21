@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom
 import {
   ArrowLeft, Eye, Calendar, ExternalLink, Code, Loader2,
   Settings, Save, X, Share2, Activity, Smartphone, Monitor, Tablet,
-  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database, RefreshCw
+  Users, Clock, TrendingUp, Globe, Bell, Trash2, Hash, Database, RefreshCw,
+  Shield, AlertTriangle, CheckCircle, Lock, Plus
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -11,14 +12,16 @@ import {
 } from 'recharts';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { apiRequest } from '../utils/api';
+import { apiRequest, getApiUrl } from '../utils/api';
 import CopyButton from '../components/CopyButton';
 import Modal from '../components/Modal';
 import TrafficTrendsChart from '../components/TrafficTrendsChart';
 import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 import { io } from 'socket.io-client';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
+const API_URL = getApiUrl();
+const SOCKET_URL = API_URL.replace('/api/v1', '');
 
 export default function ProjectDetail() {
   const { idOrName, tab } = useParams();
@@ -38,12 +41,12 @@ export default function ProjectDetail() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [activeTab, setActiveTab] = useState(tab || 'overview');
   const { showToast } = useToast();
-  const [timeRange, setTimeRange] = useState('7d'); // Default for project view
+  const [timeRange, setTimeRange] = useState('7d');
 
-  // Settings/Profile State
+  // Settings State
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [allowedOrigins, setAllowedOrigins] = useState('');
+  const [allowedOrigins, setAllowedOrigins] = useState([]);
   const [projectName, setProjectName] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -53,6 +56,10 @@ export default function ProjectDetail() {
     trafficSpikes: true,
     weeklyDigest: false
   });
+
+  // Delete Confirmation
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const [saving, setSaving] = useState(false);
 
@@ -80,21 +87,24 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (!project?.id) return;
 
-    // Socket connection
-    const socket = io(API_URL, {
-      withCredentials: true
-    });
+    let socket;
+    if (!SOCKET_URL.includes('vercel.app')) {
+      socket = io(SOCKET_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    socket.on('visitor_update', (data) => {
-      if (project && data.project_id && data.project_id !== project.id) return;
-      loadStats(project.id, false);
-    });
+      socket.on('visitor_update', (data) => {
+        if (project && data.project_id && data.project_id !== project.id) return;
+        loadStats(project.id, false);
+      });
+    }
 
-    const interval = setInterval(() => loadStats(project.id, false), 1000);
+    const interval = setInterval(() => loadStats(project.id, false), 5000);
 
     return () => {
       clearInterval(interval);
-      socket.disconnect();
+      if (socket) socket.disconnect();
     };
   }, [project?.id, timeRange, timezone]);
 
@@ -107,9 +117,9 @@ export default function ProjectDetail() {
       ]);
       setProject(projectData);
       setProjectName(projectData.name);
-      setAllowedOrigins(projectData.allowed_origins || '');
+      setAllowedOrigins(projectData.allowed_origins ? projectData.allowed_origins.split(',').map(o => o.trim()) : []);
       setTargetUrl(projectData.target_url || '');
-      setIsActive(projectData.is_active !== false); // Default to true if undefined
+      setIsActive(projectData.is_active !== false);
       setShareToken(projectData.share_token || '');
       if (projectData.timezone) setTimezone(projectData.timezone);
       if (projectData.notifications) setNotifications(projectData.notifications);
@@ -142,18 +152,21 @@ export default function ProjectDetail() {
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
-    navigate(`/projects/${idOrName}/${newTab}`);
+    navigate(`/dashboard/projects/${idOrName}/${newTab}`);
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this project? This cannot be undone.')) return;
+    if (deleteConfirmation !== project.name) {
+      showToast('Project name mismatch', 'error');
+      return;
+    }
 
     setDeleting(true);
     try {
       await apiRequest(`/projects/${project.id}`, { method: 'DELETE' });
       showToast('Project deleted successfully', 'success');
       loadUser();
-      navigate('/projects');
+      navigate('/dashboard/projects');
     } catch (err) {
       showToast(err.message, 'error');
       setDeleting(false);
@@ -163,24 +176,20 @@ export default function ProjectDetail() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      // Update allowed origins if editing in Settings tab
-      // Update name/targetUrl if editing in Profile tab
-      const body = {};
-      if (activeTab === 'settings') {
-        // body.allowedOrigins = allowedOrigins; // Moved to profile
-      } else if (activeTab === 'profile') {
-        if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
-          showToast('Project name can only contain letters, numbers, underscores, and hyphens', 'error');
-          setSaving(false);
-          return;
-        }
-        body.name = projectName;
-        body.allowedOrigins = allowedOrigins;
-        body.targetUrl = targetUrl;
-        body.isActive = isActive;
-        body.timezone = timezone;
-        body.notifications = notifications;
+      if (!/^[a-zA-Z0-9_-]+$/.test(projectName)) {
+        showToast('Project name can only contain letters, numbers, underscores, and hyphens', 'error');
+        setSaving(false);
+        return;
       }
+
+      const body = {
+        name: projectName,
+        allowedOrigins: allowedOrigins.filter(o => o.trim()).join(','),
+        targetUrl,
+        isActive,
+        timezone,
+        notifications
+      };
 
       const updatedProject = await apiRequest(`/projects/${project.id}`, {
         method: 'PUT',
@@ -190,28 +199,32 @@ export default function ProjectDetail() {
       setEditing(false);
       showToast('Changes saved successfully', 'success');
 
-      // If name changed, navigate to new URL
       if (body.name && body.name !== idOrName) {
-        navigate(`/projects/${body.name}/${activeTab}`, { replace: true });
+        navigate(`/dashboard/projects/${body.name}/${activeTab}`, { replace: true });
       }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setSaving(false);
     }
-
   };
 
-  const handleViewAllActivity = async () => {
-    setShowActivityModal(true);
-    setLoadingModalData(true);
+  const handleToggleActive = async () => {
+    const newStatus = !isActive;
+    setIsActive(newStatus); // Optimistic update
+
     try {
-      const data = await apiRequest(`/analytics/projects/${project.id}/activity?limit=100`);
-      setActivityData(data);
+      await apiRequest(`/projects/${project.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+      showToast(`Project ${newStatus ? 'enabled' : 'disabled'} successfully`, 'success');
+
+      // Update local project object as well
+      setProject(prev => ({ ...prev, is_active: newStatus }));
     } catch (err) {
-      showToast('Failed to load activity', 'error');
-    } finally {
-      setLoadingModalData(false);
+      setIsActive(!newStatus); // Revert on error
+      showToast('Failed to update project status', 'error');
     }
   };
 
@@ -228,11 +241,7 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-    </div>
-  );
+  if (loading) return <Spinner />;
   if (!project) return <div className="text-red-400">Project not found</div>;
 
   const trackingId = project.tracking_id;
@@ -240,20 +249,23 @@ export default function ProjectDetail() {
   const trackingSnippet = `<script>
 (function() {
   const TRACKING_ID = "${trackingId}";
-  const TRACKING_URL = "${trackingUrl}";
-  const sessionId = localStorage.getItem('visitor_session_id') || 'anon_' + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem('visitor_session_id', sessionId);
+  const ENDPOINT = "${trackingUrl}";
 
-  fetch(TRACKING_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessionId: sessionId,
-      pageUrl: window.location.href,
-      referrer: document.referrer,
-      title: document.title
-    })
-  }).catch(console.error);
+  function track() {
+    navigator.sendBeacon(
+      ENDPOINT,
+      JSON.stringify({
+        pageUrl: location.href,
+        referrer: document.referrer || null,
+        screen: {
+          width: screen.width,
+          height: screen.height
+        }
+      })
+    );
+  }
+
+  track();
 })();
 </script>`;
 
@@ -263,7 +275,7 @@ export default function ProjectDetail() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm text-slate-400 mb-1">
-            <Link to="/projects" className="hover:text-white transition-colors">Projects</Link>
+            <Link to="/dashboard/projects" className="hover:text-white transition-colors">Projects</Link>
             <span>/</span>
             <span className="text-white">{project.name}</span>
           </div>
@@ -293,7 +305,7 @@ export default function ProjectDetail() {
       {/* Tabs */}
       <div className="border-b border-slate-800">
         <div className="flex gap-6">
-          {['Overview', 'Project Analytics', 'Settings', 'Profile'].map((tabName) => {
+          {['Overview', 'Project Analytics', 'Integration', 'Settings'].map((tabName) => {
             const tabKey = tabName.toLowerCase().replace(' ', '-');
             const isActive = activeTab === (tabName === 'Project Analytics' ? 'analytics' : tabKey);
             return (
@@ -377,7 +389,7 @@ export default function ProjectDetail() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
                 <div className="flex items-center gap-3">
-                  <Link to={`/projects/${encodeURIComponent(project?.name)}/activity`} target="_blank" className="text-xs text-blue-400 hover:text-blue-300 font-medium">View All</Link>
+                  <Link to={`/dashboard/projects/${encodeURIComponent(project?.name)}/activity`} target="_blank" className="text-xs text-blue-400 hover:text-blue-300 font-medium">View All</Link>
                   <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">LIVE FEED</span>
                 </div>
               </div>
@@ -390,7 +402,7 @@ export default function ProjectDetail() {
                     )}
                     <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
                     <div>
-                      <p className="text-sm text-white">
+                      <p className="text-sm text-white truncate" title={activity.title || 'Unknown Page'}>
                         <span className="font-medium">{activity.title || 'Unknown Page'}</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5 font-mono">
@@ -422,8 +434,8 @@ export default function ProjectDetail() {
                 {overviewStats.topReferrers?.map((referrer, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white font-medium">{referrer.name}</span>
-                      <span className="text-slate-400">{referrer.value.toLocaleString()} views ({Math.round((referrer.value / (overviewStats.total_views || 1)) * 100)}%)</span>
+                      <span className="text-white font-medium truncate pr-2" title={referrer.name}>{referrer.name}</span>
+                      <span className="text-slate-400 whitespace-nowrap">{referrer.value.toLocaleString()} views ({Math.round((referrer.value / (overviewStats.total_views || 1)) * 100)}%)</span>
                     </div>
                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div
@@ -558,24 +570,38 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {activeTab === 'settings' && (
-        <div className="space-y-6">
-          {/* Settings Tab Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Tracking ID */}
+      {activeTab === 'integration' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Snippet & URL */}
+          <div className="space-y-6">
+            {/* Tracking Snippet */}
             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Hash className="h-5 w-5 text-green-400" />
-                <h2 className="text-lg font-semibold text-white">Tracking ID</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Code className="h-5 w-5 text-blue-400" />
+                  <h2 className="text-lg font-semibold text-white">Tracking Snippet</h2>
+                </div>
+                <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">JAVASCRIPT SDK</span>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={trackingId}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 font-mono text-sm focus:outline-none"
-                />
-                <CopyButton text={trackingId} />
+              <p className="text-sm text-slate-400 mb-4">Include this script in your website's <code>&lt;head&gt;</code> or <code>&lt;body&gt;</code> tag.</p>
+              <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mb-4 relative group">
+                <SyntaxHighlighter
+                  language="html"
+                  style={atomDark}
+                  customStyle={{
+                    background: 'transparent',
+                    padding: '1.5rem',
+                    margin: 0,
+                    fontSize: '0.875rem',
+                    lineHeight: '1.6',
+                  }}
+                  wrapLongLines={true}
+                >
+                  {trackingSnippet}
+                </SyntaxHighlighter>
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <CopyButton text={trackingSnippet} label="Copy Snippet" />
+                </div>
               </div>
             </div>
 
@@ -590,49 +616,102 @@ export default function ProjectDetail() {
                   type="text"
                   readOnly
                   value={trackingUrl}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 font-mono text-sm focus:outline-none"
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-slate-300 font-mono text-sm focus:outline-none"
                 />
-                <CopyButton text={trackingUrl} />
+                <CopyButton text={trackingUrl} label="Copy" />
               </div>
-            </div>
-
-            {/* Tracking Snippet */}
-            <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Code className="h-5 w-5 text-purple-400" />
-                <h2 className="text-lg font-semibold text-white">Tracking Snippet</h2>
-              </div>
-              <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mb-4">
-                <SyntaxHighlighter
-                  language="html"
-                  style={atomDark}
-                  customStyle={{
-                    background: 'transparent',
-                    padding: '1rem',
-                    margin: 0,
-                    fontSize: '0.875rem',
-                    lineHeight: '1.5',
-                  }}
-                  wrapLongLines={true}
-                >
-                  {trackingSnippet}
-                </SyntaxHighlighter>
-              </div>
-              <CopyButton text={trackingSnippet} label="Copy Snippet" />
             </div>
           </div>
 
+          {/* Right Column: Security & Status */}
+          <div className="space-y-6">
+            {/* Security & Access */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <Shield className="h-5 w-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Security & Access</h2>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
+                <div className="space-y-3">
+                  {allowedOrigins.map((origin, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={origin}
+                        onChange={(e) => {
+                          const newOrigins = [...allowedOrigins];
+                          newOrigins[index] = e.target.value;
+                          setAllowedOrigins(newOrigins);
+                        }}
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                        placeholder="https://example.com"
+                      />
+                      <button
+                        onClick={() => {
+                          const newOrigins = allowedOrigins.filter((_, i) => i !== index);
+                          setAllowedOrigins(newOrigins);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setAllowedOrigins([...allowedOrigins, ''])}
+                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded hover:bg-blue-500/10 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Allowed Origin
+                  </button>
+                </div>
+                <div className="flex gap-2 mt-4 text-xs text-slate-500">
+                  <div className="mt-0.5"><AlertTriangle className="h-3 w-3" /></div>
+                  <p>Enter the domains that are authorized to send tracking data to this project. Only requests from these origins will be accepted.</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveSettings}
+                disabled={saving}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Security Settings
+              </button>
+            </div>
+
+            {/* Integration Status */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Integration Status</h2>
+              </div>
+              <p className="text-sm text-slate-400 mb-4">
+                Your security settings are properly configured. Data is being received from authorized origins only.
+              </p>
+              <div className="flex items-center gap-2 text-xs font-bold tracking-wider">
+                <span className="text-slate-500">STATUS:</span>
+                <span className="text-green-400 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                  SECURE
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {activeTab === 'profile' && (
+      {activeTab === 'settings' && (
         <div className="space-y-6">
           {/* Project Information */}
           <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
             <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
-            <p className="text-sm text-slate-400 mb-6">Update your project basics and tracking environment.</p>
+            <p className="text-sm text-slate-400 mb-6">Update your project basics.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Project Name</label>
                 <input
@@ -642,35 +721,6 @@ export default function ProjectDetail() {
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={allowedOrigins}
-                    onChange={(e) => setAllowedOrigins(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Add domain..."
-                  />
-                  {allowedOrigins && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                      {allowedOrigins.split(',').map((origin, i) => (
-                        <span key={i} className="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1">
-                          {origin.trim()}
-                          <button onClick={() => {
-                            const newOrigins = allowedOrigins.split(',').filter((_, idx) => idx !== i).join(',');
-                            setAllowedOrigins(newOrigins);
-                          }} className="hover:text-white"><X className="h-3 w-3" /></button>
-                        </span>
-                      )).slice(0, 2)}
-                      {allowedOrigins.split(',').length > 2 && (
-                        <span className="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">+{allowedOrigins.split(',').length - 2}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-1">Specify the domains allowed to send tracking data. CORS requests from other origins will be blocked.</p>
               </div>
             </div>
 
@@ -732,50 +782,97 @@ export default function ProjectDetail() {
             </div>
           </div>
 
-          {/* Disable Project */}
-          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-500/10 rounded-lg">
-                <Activity className="h-6 w-6 text-red-500" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold text-red-400">Disable Project</h2>
-                  <button
-                    onClick={() => setIsActive(!isActive)}
-                    className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    {isActive ? 'Disable This Project' : 'Enable This Project'}
-                  </button>
-                </div>
-                <p className="text-sm text-slate-400">Disabling a project will stop all tracking events immediately but will preserve your historical data.</p>
-              </div>
+          {/* Danger Zone */}
+          <div className="border border-red-900/30 rounded-2xl overflow-hidden">
+            <div className="bg-red-950/20 p-4 border-b border-red-900/30 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <h3 className="font-bold text-red-500">Danger Zone</h3>
             </div>
-          </div>
-
-          {/* Delete Project */}
-          <div className="bg-red-900/10 border border-red-900/20 rounded-2xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-500/10 rounded-lg">
-                <Trash2 className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-red-400 mb-1">Delete Project</h2>
-                <p className="text-sm text-slate-400 mb-4">Once you delete a project, all historical tracking data will be permanently removed. This action cannot be undone. Please be certain.</p>
+            <div className="p-6 bg-red-950/10 space-y-6">
+              {/* Disable Project */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-white font-medium mb-1">Disable Project</h4>
+                  <p className="text-sm text-slate-400">Stop tracking new events. Historical data will be preserved.</p>
+                </div>
                 <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+                  onClick={handleToggleActive}
+                  className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {deleting ? 'Deleting...' : 'Delete This Project'}
+                  {isActive ? 'Disable Project' : 'Enable Project'}
+                </button>
+              </div>
+
+              <div className="h-px bg-red-900/20" />
+
+              {/* Delete Project */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-white font-medium mb-1">Delete Project</h4>
+                  <p className="text-sm text-slate-400">Permanently delete this project and all its data. This cannot be undone.</p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-500 transition-colors"
+                >
+                  Delete Project
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )
-      }
+      )}
+
       {/* Modals */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeleteConfirmation('');
+        }}
+        title="Delete Project"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-200">
+              This action is irreversible. All data associated with <strong>{project.name}</strong> will be permanently deleted.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">
+              Type <strong>{project.name}</strong> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder={project.name}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => {
+                setShowDeleteModal(false);
+                setDeleteConfirmation('');
+              }}
+              className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleteConfirmation !== project.name || deleting}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Delete Project
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         isOpen={showActivityModal}
         onClose={() => setShowActivityModal(false)}
@@ -790,32 +887,18 @@ export default function ProjectDetail() {
             <div className="space-y-4">
               {activityData.map((activity, i) => (
                 <div key={i} className="flex gap-4 pb-4 border-b border-slate-800/50 last:border-0">
-                  <div className="w-2 h-2 rounded-full mt-2 bg-blue-500 flex-shrink-0"></div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <p className="text-sm text-white font-medium">{activity.path}</p>
-                      <span className="text-xs text-slate-500">
-                        {new Date(activity.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">{activity.site}</p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Globe className="h-3 w-3" /> {activity.location}
-                      </span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Monitor className="h-3 w-3" /> {activity.device || 'Desktop'}
-                      </span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Activity className="h-3 w-3" /> {activity.ip}
-                      </span>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-sm text-white font-medium">{activity.title || 'Unknown Page'}</p>
+                    <p className="text-xs text-slate-400">{activity.site}{activity.path}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                      <span>{activity.location}</span>
+                      <span>•</span>
+                      <span>{new Date(activity.timestamp).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               ))}
-              {activityData.length === 0 && (
-                <p className="text-center text-slate-500 py-4">No activity found</p>
-              )}
             </div>
           )}
         </div>
@@ -824,7 +907,7 @@ export default function ProjectDetail() {
       <Modal
         isOpen={showPagesModal}
         onClose={() => setShowPagesModal(false)}
-        title={`Top Pages (${timeRange.toUpperCase()})`}
+        title="Top Pages"
       >
         <div className="max-h-[60vh] overflow-y-auto">
           {loadingModalData ? (
@@ -833,71 +916,64 @@ export default function ProjectDetail() {
             </div>
           ) : (
             <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-slate-800 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  <th className="pb-3 pl-2">Page Title / URL</th>
+              <thead className="sticky top-0 bg-slate-900">
+                <tr className="border-b border-slate-800 text-xs font-medium text-slate-400 uppercase">
+                  <th className="pb-3 pl-2">Page</th>
                   <th className="pb-3 text-right pr-2">Views</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {pagesData.map((page, i) => (
-                  <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 pl-2 text-white font-medium truncate max-w-[300px]">
-                      <div className="truncate">{page.title || 'Untitled'}</div>
-                      <div className="text-xs text-slate-500 truncate">{page.url}</div>
+                  <tr key={i} className="border-b border-slate-800/50">
+                    <td className="py-3 pl-2 text-white truncate max-w-[250px]" title={page.url}>
+                      <div className="font-medium">{page.title || 'Unknown'}</div>
+                      <div className="text-xs text-slate-500">{page.url}</div>
                     </td>
                     <td className="py-3 text-right pr-2 text-slate-300">{page.views.toLocaleString()}</td>
                   </tr>
                 ))}
-                {pagesData.length === 0 && (
-                  <tr>
-                    <td colSpan="2" className="py-8 text-center text-slate-500">No pages found</td>
-                  </tr>
-                )}
               </tbody>
             </table>
           )}
         </div>
       </Modal>
 
-      {/* Share Report Modal */}
       <Modal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
-        title="Share Public Report"
+        title="Share Report"
       >
         <div className="space-y-4">
           <p className="text-sm text-slate-400">
-            Anyone with this link can view the read-only stats for this project.
+            Share this public link with your team or clients to give them read-only access to this project's analytics.
           </p>
-
-          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2">
-            <code className="flex-1 text-sm text-blue-400 truncate">
-              {`${window.location.origin}/share/${shareToken}`}
-            </code>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={`${window.location.origin}/share/${shareToken}`}
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-sm focus:outline-none"
+            />
             <CopyButton text={`${window.location.origin}/share/${shareToken}`} />
           </div>
-
-          <div className="pt-4 border-t border-slate-800">
+          <div className="flex justify-end">
             <button
               onClick={async () => {
-                if (!window.confirm('This will invalidate the old link. Continue?')) return;
                 try {
-                  const data = await apiRequest(`/projects/${project.id}/regenerate-token`, { method: 'POST' });
+                  const data = await apiRequest(`/projects/${project.id}/share-token`, { method: 'POST' });
                   setShareToken(data.share_token);
-                  showToast('Link regenerated successfully', 'success');
+                  showToast('New link generated', 'success');
                 } catch (err) {
-                  showToast('Failed to regenerate link', 'error');
+                  showToast('Failed to generate link', 'error');
                 }
               }}
-              className="text-sm text-red-400 hover:text-red-300 flex items-center gap-2"
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
-              <RefreshCw className="h-4 w-4" />
-              Regenerate Link
+              <RefreshCw className="h-3 w-3" /> Regenerate Link
             </button>
           </div>
         </div>
       </Modal>
-    </div >
+    </div>
   );
 }

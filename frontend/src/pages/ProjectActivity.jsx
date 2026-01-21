@@ -3,6 +3,7 @@ import { useParams, Link, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, Download, FileJson, FileCode, FileText, Printer, Globe, Smartphone, Monitor, Tablet, Loader2, Code } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 
 export default function ProjectActivity() {
     const { idOrName } = useParams();
@@ -151,11 +152,7 @@ export default function ProjectActivity() {
     };
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-950">
-                <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-            </div>
-        );
+        return <Spinner />;
     }
 
     return (
@@ -165,7 +162,7 @@ export default function ProjectActivity() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
                     <div className="flex items-center gap-4">
                         <Link
-                            to={`/projects/${idOrName}`}
+                            to={`/dashboard/projects/${idOrName}`}
                             className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400 hover:text-white"
                         >
                             <ArrowLeft className="h-5 w-5" />

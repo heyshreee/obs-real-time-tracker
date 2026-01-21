@@ -13,6 +13,7 @@ const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
 const ProjectActivity = lazy(() => import('./pages/ProjectActivity'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Billing = lazy(() => import('./pages/Billing'));
+const APIKeys = lazy(() => import('./pages/APIKeys'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Blog = lazy(() => import('./pages/Blog'));
@@ -23,6 +24,7 @@ const Integrations = lazy(() => import('./pages/Integrations'));
 const Documentation = lazy(() => import('./pages/Documentation'));
 const Community = lazy(() => import('./pages/Community'));
 const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 import { ToastProvider } from './context/ToastContext';
 import { isAuthenticated } from './utils/auth';
 import './App.css';
@@ -45,7 +47,7 @@ function App() {
                                 <Route path="/register" element={<Register />} />
 
                                 <Route
-                                    path="/projects/:idOrName/activity"
+                                    path="/dashboard/projects/:idOrName/activity"
                                     element={
                                         <PrivateRoute>
                                             <ProjectActivity />
@@ -64,16 +66,15 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/projects"
+                                        path="/dashboard/projects"
                                         element={
                                             <PrivateRoute>
                                                 <Projects />
                                             </PrivateRoute>
                                         }
                                     />
-
                                     <Route
-                                        path="/projects/:idOrName/:tab?"
+                                        path="/dashboard/projects/:idOrName/:tab?"
                                         element={
                                             <PrivateRoute>
                                                 <ProjectDetail />
@@ -81,7 +82,15 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/profile"
+                                        path="/dashboard/api-key"
+                                        element={
+                                            <PrivateRoute>
+                                                <APIKeys />
+                                            </PrivateRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/dashboard/profile"
                                         element={
                                             <PrivateRoute>
                                                 <Profile />
@@ -89,7 +98,7 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/billing"
+                                        path="/dashboard/billing"
                                         element={
                                             <PrivateRoute>
                                                 <Billing />
@@ -110,6 +119,7 @@ function App() {
                                 <Route path="/privacy" element={<Legal type="privacy" />} />
                                 <Route path="/terms" element={<Legal type="terms" />} />
                                 <Route path="/cookies" element={<Legal type="cookies" />} />
+                                <Route path="*" element={<NotFound />} />
                             </Routes>
                         </Suspense>
                     </div>
