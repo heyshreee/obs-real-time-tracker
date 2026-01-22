@@ -96,6 +96,22 @@ exports.createProject = async (req, res) => {
             );
         }
 
+        // Activity Log
+        await ActivityLogService.log(
+            project.id,
+            userId,
+            'project.create',
+            `Project "${project.name}" created`,
+            'success',
+            req.ip,
+            {
+                resource: '/projects',
+                http_method: 'POST',
+                http_status: 201,
+                user_agent: req.headers['user-agent']
+            }
+        );
+
         res.status(201).json(project);
     } catch (error) {
         console.error('Create project error:', error);
@@ -203,6 +219,22 @@ exports.deleteProject = async (req, res) => {
             'system'
         );
 
+        // Activity Log
+        await ActivityLogService.log(
+            projectId,
+            userId,
+            'project.delete',
+            `Project deleted`,
+            'success',
+            req.ip,
+            {
+                resource: `/projects/${id}`,
+                http_method: 'DELETE',
+                http_status: 200,
+                user_agent: req.headers['user-agent']
+            }
+        );
+
         res.json({ success: true });
     } catch (error) {
         console.error('Delete project error:', error);
@@ -272,17 +304,31 @@ exports.updateProject = async (req, res) => {
             await ActivityLogService.log(
                 projectId,
                 userId,
-                'Project Disabled',
-                `Manual suspension by project owner. Reason: User action`,
-                isActive ? 'success' : 'warning'
+                'project.status',
+                `Project ${isActive ? 'enabled' : 'disabled'}`,
+                isActive ? 'success' : 'warning',
+                req.ip,
+                {
+                    resource: `/projects/${id}`,
+                    http_method: 'PATCH',
+                    http_status: 200,
+                    user_agent: req.headers['user-agent']
+                }
             );
         } else if (Object.keys(updates).length > 0) {
             await ActivityLogService.log(
                 projectId,
                 userId,
-                'Settings Updated',
+                'project.update',
                 'Project settings were updated',
-                'success'
+                'success',
+                req.ip,
+                {
+                    resource: `/projects/${id}`,
+                    http_method: 'PATCH',
+                    http_status: 200,
+                    user_agent: req.headers['user-agent']
+                }
             );
         }
 

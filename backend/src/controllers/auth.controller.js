@@ -54,6 +54,24 @@ exports.register = async (req, res) => {
         const { logAction } = require('../services/audit.service');
         await logAction(newUser.id, 'USER_REGISTER');
 
+        // Activity Log
+        const ActivityLogService = require('../services/activity.service');
+        await ActivityLogService.log(
+            null, // No specific project for registration
+            newUser.id,
+            'auth.register',
+            `User registered: ${newUser.email}`,
+            'success',
+            req.ip,
+            {
+                resource: '/auth/register',
+                http_method: 'POST',
+                http_status: 201,
+                user_agent: req.headers['user-agent'],
+                plan: newUser.plan
+            }
+        );
+
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -99,6 +117,24 @@ exports.login = async (req, res) => {
         // Audit Log
         const { logAction } = require('../services/audit.service');
         await logAction(user.id, 'USER_LOGIN');
+
+        // Activity Log
+        const ActivityLogService = require('../services/activity.service');
+        await ActivityLogService.log(
+            null, // No specific project for login
+            user.id,
+            'auth.login',
+            `User logged in: ${user.email}`,
+            'success',
+            req.ip,
+            {
+                resource: '/auth/login',
+                http_method: 'POST',
+                http_status: 200,
+                user_agent: req.headers['user-agent'],
+                plan: user.plan
+            }
+        );
 
         res.cookie('token', token, {
             httpOnly: true,

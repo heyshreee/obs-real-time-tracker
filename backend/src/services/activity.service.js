@@ -10,61 +10,73 @@ class ActivityLogService {
      * @param {string} details - Additional details
      * @param {string} status - Status of the action ('success', 'warning', 'failure')
      * @param {string} ip - IP address of the user
+     * @param {object} metadata - Additional metadata (session_id, resource, http_method, http_status, latency_ms, country, city, user_agent, request_id, plan)
      */
-    static async log(projectId, userId, action, details, status = 'success', ip = null) {
+    static async log(projectId, userId, action, details, status = 'success', ip = null, metadata = {}) {
         try {
-            // 1. Insert new log
-            const { error } = await supabase
-                .from('activity_logs')
-                .insert({
-                    project_id: projectId,
-                    user_id: userId,
-                    action,
-                    details,
-                    status,
-                    ip_address: ip,
-                    created_at: new Date().toISOString()
-                });
+            const logEntry = {
+                project_id: projectId,
+                user_id: userId,
+                action,
+                details,
+                status,
+                ip_address: ip,
+                event_type: metadata.event_type || 'activity',
+                session_id: metadata.session_id,
+                resource: metadata.resource,
+                http_method: metadata.http_method,
+                http_status: metadata.http_status,
+                latency_ms: metadata.latency_ms,
+                country: metadata.country,
+                city: metadata.city,
+                user_agent: metadata.user_agent,
+                request_id: metadata.request_id || `req_${crypto.randomBytes(4).toString('hex')}`,
+                plan: metadata.plan,
+                created_at: new Date().toISOString()
+            };
 
-            if (error) throw error;
+            // 1. Insert new log
+            const { data: insertedLog, error } = await supabase
+                .from('activity_logs')
+                .insert(logEntry)
+                .select()
+                .single();
+
+            if (error) {
+                // If columns don't exist yet, we might need to handle it or just log the error
+                // For now, we assume the DB is updated or we'll handle the error
+                console.error('Supabase insert error:', error.message);
+                // Fallback: try inserting without new columns if it fails due to missing columns
+                if (error.code === 'PGRST204' || error.message.includes('column')) {
+                    const { error: fallbackError } = await supabase
+                        .from('activity_logs')
+                        .insert({
+                            project_id: projectId,
+                            user_id: userId,
+                            action,
+                            details,
+                            status,
+                            ip_address: ip,
+                            created_at: new Date().toISOString()
+                        });
+                    if (fallbackError) throw fallbackError;
+                } else {
+                    throw error;
+                }
+            }
+
+            const finalLog = insertedLog || { ...logEntry, id: crypto.randomUUID() };
 
             // 2. Check and enforce 1000 limit (FIFO)
-            // We can do this asynchronously to not block the response
             this.enforceLimit(projectId);
 
             // 3. Emit real-time event
             if (global.io) {
                 // Emit to project room
-                global.io.to(`project_${projectId}`).emit('activity_new', {
-                    id: crypto.randomUUID(), // Optimistic ID or fetch from DB if needed, but we didn't select it.
-                    // Actually, insert returns null data by default unless .select() is used.
-                    // Let's modify insert to select().
-                    project_id: projectId,
-                    user_id: userId,
-                    action,
-                    details,
-                    status,
-                    ip_address: ip,
-                    created_at: new Date().toISOString()
-                });
+                global.io.to(`project_${projectId}`).emit('activity_new', finalLog);
 
-                // Also emit to user room if userId is present (for global view)
-                // But global view might need to subscribe to all projects?
-                // Or we emit to user's personal room if they are the owner of the project.
-                // We don't have owner ID here easily without fetching project.
-                // But we can emit to `project_${projectId}` and frontend subscribes to all project rooms it cares about?
-                // Or better: emit to `user_${ownerId}`.
-                // We need to know who owns the project.
-                // We can fetch project owner.
-                this.emitRealTimeUpdate(projectId, {
-                    project_id: projectId,
-                    user_id: userId,
-                    action,
-                    details,
-                    status,
-                    ip_address: ip,
-                    created_at: new Date().toISOString()
-                });
+                // Also emit to user room for global view
+                this.emitRealTimeUpdate(projectId, finalLog);
             }
 
             return true;
@@ -136,18 +148,24 @@ class ActivityLogService {
     /**
      * Get logs for a project or all projects for a user
      */
-    static async getLogs(projectId, userId, { page = 1, limit = 20, search = '', type = 'all', days = 'all' }) {
+    static async getLogs(projectId, userId, { page = 1, limit = 20, search = '', type = 'all', days = '30d' }) {
         try {
+            // 1. Calculate 30-day window (Strictly enforced)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+            // 2. Build query
             let query = supabase
                 .from('activity_logs')
                 .select('*', { count: 'exact' })
+                .gte('created_at', thirtyDaysAgoStr) // Enforce 30-day window
                 .order('created_at', { ascending: false });
 
             if (projectId) {
                 query = query.eq('project_id', projectId);
             } else if (userId) {
                 // Fetch logs for all projects owned by the user
-                // First get project IDs
                 const { data: projects } = await supabase
                     .from('projects')
                     .select('id')
@@ -167,24 +185,16 @@ class ActivityLogService {
             }
 
             if (type && type !== 'all') {
-                // Assuming 'type' maps to 'status' or we need a 'type' column?
-                // The design shows 'Event Type' which seems to be the 'action' or a category.
-                // For now, let's assume filtering by status if type is success/warning/failure
-                // Or if user meant 'Event Type' as 'action', we might need fuzzy match.
-                // Let's stick to status for now if it matches, or just ignore if not.
-                // Actually, the screenshot shows "All Events" dropdown.
-                // Let's assume it filters by status for now.
                 if (['success', 'warning', 'failure'].includes(type.toLowerCase())) {
                     query = query.eq('status', type.toLowerCase());
                 }
             }
 
-            if (days && days !== 'all') {
+            if (days && days !== 'all' && days !== '30d') {
                 const now = new Date();
                 let pastDate;
                 if (days === '24h') pastDate = new Date(now - 24 * 60 * 60 * 1000);
                 else if (days === '7d') pastDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-                else if (days === '30d') pastDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
                 if (pastDate) {
                     query = query.gte('created_at', pastDate.toISOString());
@@ -200,7 +210,7 @@ class ActivityLogService {
 
             if (error) throw error;
 
-            // Manually fetch project names since join failed
+            // Manually fetch project names
             if (data && data.length > 0) {
                 const projectIds = [...new Set(data.map(l => l.project_id))];
                 const { data: projects } = await supabase
@@ -214,8 +224,6 @@ class ActivityLogService {
 
                     data.forEach(log => {
                         log.project = { name: projectMap[log.project_id] || 'Unknown' };
-                        // Also mock user email if needed, or just leave as System/Unknown
-                        // log.user = { email: '...' }; 
                     });
                 }
             }
@@ -229,6 +237,29 @@ class ActivityLogService {
         } catch (error) {
             console.error('Error fetching activity logs:', error.message);
             throw error;
+        }
+    }
+
+    /**
+     * Manually delete logs older than 30 days
+     * Fallback for systems without pg_cron
+     */
+    static async cleanup() {
+        try {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const { error, count } = await supabase
+                .from('activity_logs')
+                .delete()
+                .lt('created_at', thirtyDaysAgo.toISOString());
+
+            if (error) throw error;
+            console.log(`[Cleanup] Deleted ${count || 0} old activity logs`);
+            return true;
+        } catch (error) {
+            console.error('Error cleaning up activity logs:', error.message);
+            return false;
         }
     }
 }

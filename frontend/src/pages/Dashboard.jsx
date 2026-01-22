@@ -5,7 +5,6 @@ import { apiRequest } from '../utils/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import { useToast } from '../context/ToastContext';
-import { io } from 'socket.io-client';
 import {
   AreaChart,
   Area,
@@ -21,7 +20,7 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
-  const { user, loadUser, usageStats } = useOutletContext();
+  const { user, loadUser, usageStats, socket } = useOutletContext();
   const [projects, setProjects] = useState([]);
   const [stats, setStats] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -43,28 +42,24 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
 
-    // Socket.io connection
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    let socket;
+    const interval = setInterval(() => loadData(false), 10000); // Poll every 10s as fallback
 
-    if (!apiUrl.includes('vercel.app')) {
-      socket = io(apiUrl, {
-        withCredentials: true,
-        transports: ['websocket', 'polling']
-      });
+    if (socket) {
+      const handleVisitorUpdate = () => loadData(false);
+      const handleUsageUpdate = () => loadUser(); // Refresh usage stats via loadUser
 
-      socket.on('visitor_update', () => {
-        loadData(false);
-      });
+      socket.on('visitor_update', handleVisitorUpdate);
+      socket.on('usage_update', handleUsageUpdate);
+
+      return () => {
+        clearInterval(interval);
+        socket.off('visitor_update', handleVisitorUpdate);
+        socket.off('usage_update', handleUsageUpdate);
+      };
     }
 
-    const interval = setInterval(() => loadData(false), 5000); // Poll every 5s
-
-    return () => {
-      clearInterval(interval);
-      if (socket) socket.disconnect();
-    };
-  }, [user?.id, timeRange]);
+    return () => clearInterval(interval);
+  }, [user?.id, timeRange, socket]);
 
   const loadData = async (showLoading = true) => {
     if (showLoading) setLoading(true);

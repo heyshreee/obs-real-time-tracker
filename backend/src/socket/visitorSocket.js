@@ -41,6 +41,17 @@ module.exports = (io) => {
             }
         }, 5 * 60 * 1000);
 
+        // Project rooms
+        socket.on('join_project', (projectId) => {
+            socket.join(`project_${projectId}`);
+            console.log(`User ${socket.user.id} joined room project_${projectId}`);
+        });
+
+        socket.on('leave_project', (projectId) => {
+            socket.leave(`project_${projectId}`);
+            console.log(`User ${socket.user.id} left room project_${projectId}`);
+        });
+
         socket.on('disconnect', () => {
             clearInterval(revalidateInterval);
             console.log('Client disconnected');

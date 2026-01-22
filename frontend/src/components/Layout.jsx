@@ -20,6 +20,7 @@ import { io } from 'socket.io-client';
 import Notifications from './Notifications';
 
 const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000')).replace(/\/$/, '');
+const SOCKET_URL = API_URL.replace(/\/api$/, '').replace(/\/v1$/, '');
 
 export default function Layout() {
     const [user, setUser] = useState(null);
@@ -32,7 +33,9 @@ export default function Layout() {
         storageUsed: 0,
         storageLimit: 1024 * 1024 * 1024,
         plan: 'free',
-        projectLimit: 5
+        projectLimit: 5,
+        liveLogs: false,
+        emailIntegrity: false
     });
     const location = useLocation();
     const navigate = useNavigate();
@@ -47,20 +50,27 @@ export default function Layout() {
 
         // Socket connection (Skip on Vercel)
         if (!API_URL.includes('vercel.app')) {
-            socketRef.current = io(API_URL, {
+            const newSocket = io(SOCKET_URL, {
                 withCredentials: true,
-                transports: ['websocket', 'polling']
+                transports: ['websocket', 'polling'],
+                reconnectionAttempts: 5
             });
-            window.socket = socketRef.current;
-            setSocket(socketRef.current);
 
-            socketRef.current.on('connect', () => {
+            socketRef.current = newSocket;
+            window.socket = newSocket;
+            setSocket(newSocket);
+
+            newSocket.on('connect', () => {
                 if (user) {
-                    socketRef.current.emit('join', `user_${user.id}`);
+                    newSocket.emit('join', `user_${user.id}`);
                 }
             });
 
-            socketRef.current.on('usage_update', (data) => {
+            newSocket.on('connect_error', (err) => {
+                console.error('❌ Socket.IO connection error:', err.message);
+            });
+
+            newSocket.on('usage_update', (data) => {
                 setUsageStats(prev => ({
                     ...prev,
                     totalViews: data.totalViews,
@@ -69,7 +79,7 @@ export default function Layout() {
                 }));
             });
 
-            socketRef.current.on('new_notification', (data) => {
+            newSocket.on('new_notification', (data) => {
                 window.dispatchEvent(new CustomEvent('notification_received', { detail: data }));
             });
         }
@@ -79,7 +89,13 @@ export default function Layout() {
         return () => {
             clearInterval(interval);
             if (socketRef.current) {
-                socketRef.current.disconnect();
+                const s = socketRef.current;
+                socketRef.current = null;
+                // Small delay to avoid "WebSocket is closed before the connection is established" in dev
+                setTimeout(() => {
+                    if (s.connected) s.disconnect();
+                    else s.close();
+                }, 10);
             }
         };
     }, [user?.id]);

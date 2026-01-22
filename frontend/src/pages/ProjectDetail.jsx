@@ -59,6 +59,7 @@ export default function ProjectDetail() {
 
   // Delete Confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDisableModal, setShowDisableModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -210,8 +211,14 @@ export default function ProjectDetail() {
   };
 
   const handleToggleActive = async () => {
+    if (isActive && !showDisableModal) {
+      setShowDisableModal(true);
+      return;
+    }
+
     const newStatus = !isActive;
     setIsActive(newStatus); // Optimistic update
+    setShowDisableModal(false);
 
     try {
       await apiRequest(`/projects/${project.id}`, {
@@ -880,6 +887,38 @@ export default function ProjectDetail() {
       </Modal>
 
       <Modal
+        isOpen={showDisableModal}
+        onClose={() => setShowDisableModal(false)}
+        title="Disable Project"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+            <p className="text-sm text-yellow-200">
+              Disabling <strong>{project.name}</strong> will stop all new visitor tracking. Historical data will remain accessible.
+            </p>
+          </div>
+          <p className="text-sm text-slate-400">
+            Are you sure you want to disable this project? You can re-enable it at any time.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setShowDisableModal(false)}
+              className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleToggleActive}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-500 transition-colors"
+            >
+              Disable Project
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={showActivityModal}
         onClose={() => setShowActivityModal(false)}
         title="Recent Activity Log"
@@ -980,6 +1019,6 @@ export default function ProjectDetail() {
           </div>
         </div>
       </Modal>
-    </div>
+    </div >
   );
 }

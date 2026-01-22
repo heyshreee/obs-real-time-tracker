@@ -104,7 +104,9 @@ exports.calculateUsage = async (userId) => {
             pageViews: viewStorage
         },
         plan,
-        projectLimit: limits.projectLimit
+        projectLimit: limits.projectLimit,
+        liveLogs: limits.liveLogs,
+        emailIntegrity: limits.emailIntegrity
     };
 };
 
@@ -177,7 +179,12 @@ exports.checkLimit = async (userId, type = 'track') => {
                     userId,
                     'Plan Limit Reached',
                     `Project creation blocked: ${usage.plan} plan limit of ${usage.projectLimit} projects reached`,
-                    'warning'
+                    'warning',
+                    null,
+                    {
+                        event_type: 'system.limit',
+                        plan: usage.plan
+                    }
                 );
             }
         }
