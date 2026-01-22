@@ -6,6 +6,7 @@ const usageService = require('../services/usage.service');
 const { getClientIp } = require('../utils/ip');
 const crypto = require('crypto');
 const NotificationService = require('../services/notification.service');
+const ActivityLogService = require('../services/activity.service');
 
 // Simple in-memory cache for deduplication (rolling TTL)
 const requestCache = new Map();
@@ -70,7 +71,7 @@ exports.trackVisitor = async (req, res) => {
 
         if (requestCache.has(hitHash)) {
             const lastHit = requestCache.get(hitHash);
-            if (now - lastHit < 30000) { // 30 seconds TTL
+            if (now - lastHit < 2000) { // 2 seconds TTL
                 return res.json({ success: true, ignored: 'DUPLICATE_HIT' });
             }
         }
@@ -467,7 +468,7 @@ exports.trackVisitorPublic = async (req, res) => {
         const origin = req.headers['origin'] || req.headers['referer'];
         if (project.allowed_origins && project.allowed_origins.length > 0 && origin) {
             const originHostname = new URL(origin).hostname;
-            const isAllowed = project.allowed_origins.some(allowed => 
+            const isAllowed = project.allowed_origins.some(allowed =>
                 originHostname === allowed || originHostname.endsWith('.' + allowed)
             );
 
@@ -598,6 +599,16 @@ exports.trackVisitorPublic = async (req, res) => {
                 const updatedUsage = await usageService.calculateUsage(project.user_id);
                 global.io.to(`user_${project.user_id}`).emit('usage_update', updatedUsage);
             }
+
+            // Log Activity for New Visitor
+            await ActivityLogService.log(
+                project.id,
+                null, // No user ID for public visitor
+                'New Visitor',
+                `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
+                'success',
+                ip
+            );
 
             // We don't need to return the count for sendBeacon requests, but we'll keep it for now
             // in case someone uses fetch and wants it.

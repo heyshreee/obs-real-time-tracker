@@ -661,11 +661,17 @@ export default function ProjectDetail() {
                   ))}
                   <button
                     onClick={() => setAllowedOrigins([...allowedOrigins, ''])}
-                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded hover:bg-blue-500/10 transition-colors"
+                    disabled={allowedOrigins.length >= (user?.limits?.allowedOriginsLimit || 1)}
+                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded hover:bg-blue-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-blue-400"
                   >
                     <Plus className="h-4 w-4" />
                     Add Allowed Origin
                   </button>
+                  {allowedOrigins.length >= (user?.limits?.allowedOriginsLimit || 1) && (
+                    <p className="text-xs text-yellow-400 mt-2">
+                      Your {user?.plan || 'free'} plan allows {user?.limits?.allowedOriginsLimit || 1} allowed origin(s). Upgrade to Pro for unlimited origins.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-4 text-xs text-slate-500">
                   <div className="mt-0.5"><AlertTriangle className="h-3 w-3" /></div>

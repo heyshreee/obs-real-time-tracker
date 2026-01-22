@@ -178,8 +178,8 @@ export default function Landing() {
                             {
                                 icon: <Activity className="h-6 w-6 text-blue-400" />,
                                 color: "bg-blue-500/10",
-                                title: "Real-time Performance Tracking",
-                                desc: "Monitor stream health, viewer latency, and engagement metrics as they happen. Never miss a drop in quality."
+                                title: "Real-time Activity Logs",
+                                desc: "Monitor every visitor action as it happens. Watch your traffic grow live with instant updates."
                             },
                             {
                                 icon: <Layout className="h-6 w-6 text-purple-400" />,
@@ -272,7 +272,7 @@ export default function Landing() {
                                     <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 10 Projects
+                                    <Check className="h-4 w-4 text-green-500" /> 5 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> Basic Analytics
@@ -293,13 +293,16 @@ export default function Landing() {
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 500k events/mo
+                                    <Check className="h-4 w-4 text-white" /> 100,000 events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Unlimited Projects
+                                    <Check className="h-4 w-4 text-white" /> 100 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> AI-Powered Insights
+                                </li>
+                                <li className="flex items-center gap-3 text-white text-sm">
+                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> Email Notifications
@@ -321,7 +324,7 @@ export default function Landing() {
                                     <Check className="h-4 w-4 text-green-500" /> Custom volume
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Unlimited Projects
+                                    <Check className="h-4 w-4 text-green-500" /> 1,000 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> Advanced AI Models

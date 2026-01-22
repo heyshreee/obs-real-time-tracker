@@ -3,31 +3,16 @@ import { useParams, useOutletContext } from 'react-router-dom';
 import {
     Search, Download, Filter, ChevronLeft, ChevronRight,
     Key, Shield, AlertTriangle, Settings, Lock, Activity,
-    CheckCircle, XCircle, AlertCircle, RefreshCw, Zap
+    CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import Spinner from '../components/Spinner';
+import io from 'socket.io-client';
 
-export default function ProjectActivity() {
+export default function ActivityLog() {
     const { idOrName } = useParams();
-    // const { project } = useOutletContext(); // This might fail if not in Layout context correctly or if context is different.
-    // ProjectActivity is rendered inside Layout -> PrivateRoute.
-    // But wait, App.jsx renders it as:
-    // <Route path="/dashboard/projects/:idOrName/activity" element={<PrivateRoute><ProjectActivity /></PrivateRoute>} />
-    // It is NOT inside the nested Route element={<Layout />}> ... </Route> block in App.jsx?
-    // Let's check App.jsx again.
-    // Line 50: It is OUTSIDE the Layout route wrapper.
-    // So useOutletContext() will NOT work if it expects Layout's context.
-    // However, the screenshot shows the sidebar.
-    // If it's outside Layout, it won't have the sidebar.
-    // The user wants it in the sidebar, so it should be part of the dashboard layout.
-    // I should move the route INSIDE the Layout wrapper in App.jsx.
-
-    // For now, I will write the component assuming I will fix the route in App.jsx next.
-    // I'll fetch project data if context is missing or just use idOrName.
-
-    const [project, setProject] = useState(null);
+    const { project } = useOutletContext();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -36,54 +21,39 @@ export default function ProjectActivity() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalLogs, setTotalLogs] = useState(0);
-    const [isLive, setIsLive] = useState(false);
     const { showToast } = useToast();
-    const { socket, user } = useOutletContext(); // Get user to check plan
 
     useEffect(() => {
-        loadData();
+        if (project?.id) {
+            loadLogs();
 
-        // Socket listener
-        const handleNewActivity = (newLog) => {
-            if (!isLive) return; // Only update if live mode is on
+            // Setup Socket.IO for real-time updates
+            const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+                transports: ['websocket', 'polling']
+            });
 
-            // If viewing specific project, filter
-            if (idOrName) {
-                if (project && (newLog.project_id === project.id)) {
-                    setLogs(prev => [newLog, ...prev]);
+            // Join project room
+            socket.emit('join_project', project.id);
+
+            // Listen for new activity logs
+            socket.on('activity_new', (newLog) => {
+                // Only add if we're on page 1 and filters match
+                if (page === 1) {
+                    setLogs(prevLogs => [newLog, ...prevLogs.slice(0, 9)]);
                     setTotalLogs(prev => prev + 1);
                 }
-            } else {
-                // Global view: show all
-                setLogs(prev => [newLog, ...prev]);
-                setTotalLogs(prev => prev + 1);
-            }
-        };
+            });
 
-        if (socket && isLive) {
-            socket.on('activity_new', handleNewActivity);
+            return () => {
+                socket.emit('leave_project', project.id);
+                socket.disconnect();
+            };
         }
+    }, [project?.id, page, search, eventType, timeRange]);
 
-        return () => {
-            if (socket) {
-                socket.off('activity_new', handleNewActivity);
-            }
-        };
-    }, [idOrName, project, page, search, eventType, timeRange, socket, isLive]);
-
-    const loadData = async () => {
+    const loadLogs = async () => {
         setLoading(true);
         try {
-            // 1. Get Project ID if we only have name
-            // 1. Get Project ID if we only have name
-            let projectId = project?.id;
-            if (idOrName && !projectId) {
-                const p = await apiRequest(`/projects/${idOrName}`);
-                setProject(p);
-                projectId = p.id;
-            }
-
-            // 2. Get Logs
             const query = new URLSearchParams({
                 page,
                 limit: 10,
@@ -92,8 +62,7 @@ export default function ProjectActivity() {
                 days: timeRange
             });
 
-            const endpoint = projectId ? `/activity/${projectId}` : '/activity';
-            const data = await apiRequest(`${endpoint}?${query.toString()}`);
+            const data = await apiRequest(`/activity/${project.id}?${query.toString()}`);
             setLogs(data.logs);
             setTotalPages(data.totalPages);
             setTotalLogs(data.total);
@@ -145,7 +114,7 @@ export default function ProjectActivity() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `activity-log-${project?.name || 'project'}-${new Date().toISOString()}.csv`;
+        a.download = `activity-log-${project.name}-${new Date().toISOString()}.csv`;
         a.click();
     };
 
@@ -153,9 +122,7 @@ export default function ProjectActivity() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-white mb-2">Activity Log</h1>
-                <p className="text-slate-400">
-                    {idOrName ? `Monitor events for ${project?.name || 'project'}` : 'Monitor all events across all your projects'}
-                </p>
+                <p className="text-slate-400">Monitor all events and security changes across your project.</p>
             </div>
 
             {/* Controls */}
@@ -201,36 +168,6 @@ export default function ProjectActivity() {
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline">Export CSV</span>
                     </button>
-
-                    <div className="h-8 w-px bg-slate-800 mx-1"></div>
-
-                    <button
-                        onClick={() => loadData()}
-                        className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
-                        title="Refresh Logs"
-                    >
-                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            if (user?.plan === 'pro') {
-                                setIsLive(!isLive);
-                                if (!isLive) showToast('Live mode enabled', 'success');
-                            } else {
-                                showToast('Live logs are available on Pro plan', 'info');
-                            }
-                        }}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${isLive
-                            ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20'
-                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
-                            }`}
-                        title={user?.plan === 'pro' ? 'Toggle Live Mode' : 'Upgrade to Pro for Live Mode'}
-                    >
-                        <Zap className={`h-4 w-4 ${isLive ? 'fill-current' : ''}`} />
-                        <span className="hidden sm:inline font-medium">{isLive ? 'Live' : 'Go Live'}</span>
-                        {user?.plan !== 'pro' && <span className="text-[10px] bg-blue-600 text-white px-1.5 rounded ml-1">PRO</span>}
-                    </button>
                 </div>
             </div>
 
@@ -241,7 +178,6 @@ export default function ProjectActivity() {
                         <thead>
                             <tr className="border-b border-slate-800 bg-slate-950/50 text-xs font-medium text-slate-400 uppercase tracking-wider">
                                 <th className="px-6 py-4">Timestamp</th>
-                                {!idOrName && <th className="px-6 py-4">Project</th>}
                                 <th className="px-6 py-4">Event Type</th>
                                 <th className="px-6 py-4">User</th>
                                 <th className="px-6 py-4">Details</th>
@@ -274,13 +210,6 @@ export default function ProjectActivity() {
                                                 {new Date(log.created_at).toLocaleTimeString()}
                                             </div>
                                         </td>
-                                        {!idOrName && (
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm text-white font-medium">
-                                                    {log.project?.name || 'Unknown'}
-                                                </div>
-                                            </td>
-                                        )}
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2 rounded-lg bg-slate-800 border border-slate-700">
@@ -330,6 +259,7 @@ export default function ProjectActivity() {
                         </button>
                         <div className="flex items-center gap-1">
                             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                // Simple logic to show first 5 pages or sliding window could be better but this is MVP
                                 const p = i + 1;
                                 return (
                                     <button

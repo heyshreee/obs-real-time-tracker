@@ -46,14 +46,7 @@ function App() {
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
 
-                                <Route
-                                    path="/dashboard/projects/:idOrName/activity"
-                                    element={
-                                        <PrivateRoute>
-                                            <ProjectActivity />
-                                        </PrivateRoute>
-                                    }
-                                />
+
 
                                 {/* Protected Routes wrapped in Layout */}
                                 <Route element={<Layout />}>
@@ -102,6 +95,22 @@ function App() {
                                         element={
                                             <PrivateRoute>
                                                 <Billing />
+                                            </PrivateRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/dashboard/projects/:idOrName/activity"
+                                        element={
+                                            <PrivateRoute>
+                                                <ProjectActivity />
+                                            </PrivateRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/dashboard/activity"
+                                        element={
+                                            <PrivateRoute>
+                                                <ProjectActivity />
                                             </PrivateRoute>
                                         }
                                     />

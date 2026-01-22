@@ -28,15 +28,17 @@ export default function Layout() {
     const [pinnedProjects, setPinnedProjects] = useState([]);
     const [usageStats, setUsageStats] = useState({
         totalViews: 0,
-        monthlyLimit: 10000,
+        monthlyLimit: 1000,
         storageUsed: 0,
         storageLimit: 1024 * 1024 * 1024,
-        plan: 'free'
+        plan: 'free',
+        projectLimit: 5
     });
     const location = useLocation();
     const navigate = useNavigate();
     const { showToast } = useToast();
 
+    const [socket, setSocket] = useState(null);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -49,6 +51,8 @@ export default function Layout() {
                 withCredentials: true,
                 transports: ['websocket', 'polling']
             });
+            window.socket = socketRef.current;
+            setSocket(socketRef.current);
 
             socketRef.current.on('connect', () => {
                 if (user) {
@@ -100,6 +104,11 @@ export default function Layout() {
 
             setPinnedProjects(projects.filter(p => p.is_pinned));
             setUsageStats(usage);
+
+            // Sync user plan if it changed
+            if (usage.plan && user && usage.plan !== user.plan) {
+                setUser(prev => ({ ...prev, plan: usage.plan }));
+            }
         } catch (error) {
             console.error('Failed to load sidebar data', error);
         }
@@ -117,6 +126,7 @@ export default function Layout() {
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/dashboard/projects', label: 'Projects', icon: Folder },
+        { path: '/dashboard/activity', label: 'Activity Log', icon: Activity },
         { path: '/dashboard/api-key', label: 'API Keys', icon: Key },
         { path: '/dashboard/billing', label: 'Billing', icon: CreditCard },
     ];
@@ -283,7 +293,7 @@ export default function Layout() {
                                 <div className="text-right hidden sm:block leading-tight">
                                     <div className="text-sm font-bold text-white">{user.email}</div>
                                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                                        {user.plan === 'pro' ? 'Enterprise Pro' : 'Free Plan'}
+                                        {user.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
                                     </div>
                                 </div>
                                 <div className="relative group">
@@ -313,7 +323,7 @@ export default function Layout() {
 
                 {/* Page Content */}
                 < main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" >
-                    <Outlet context={{ user, loadUser, loadSidebarData, usageStats }} />
+                    <Outlet context={{ user, loadUser, loadSidebarData, usageStats, socket }} />
                 </main >
             </div >
         </div >

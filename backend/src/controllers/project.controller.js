@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
 const NotificationService = require('../services/notification.service');
+const ActivityLogService = require('../services/activity.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -34,6 +35,20 @@ exports.createProject = async (req, res) => {
 
         if (existingProjects && existingProjects.length > 0) {
             return res.status(400).json({ error: 'Project with this name already exists' });
+        }
+
+        // Validate allowed origins count against plan limit
+        if (allowedOrigins) {
+            const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
+            const usage = await usageService.calculateUsage(userId);
+            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+
+            if (originsArray.length > allowedOriginsLimit) {
+                return res.status(403).json({
+                    error: 'LIMIT_EXCEEDED',
+                    message: `Your ${usage.plan} plan allows only ${allowedOriginsLimit} allowed origin(s). Upgrade to Pro for unlimited origins.`
+                });
+            }
         }
 
         const trackingId = 'trk_' + uuidv4().replace(/-/g, '').substring(0, 12);
@@ -221,7 +236,22 @@ exports.updateProject = async (req, res) => {
             }
             updates.name = name;
         }
-        if (allowedOrigins !== undefined) updates.allowed_origins = allowedOrigins;
+
+        // Validate allowed origins count against plan limit
+        if (allowedOrigins !== undefined) {
+            const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
+            const usage = await usageService.calculateUsage(userId);
+            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+
+            if (originsArray.length > allowedOriginsLimit) {
+                return res.status(403).json({
+                    error: 'LIMIT_EXCEEDED',
+                    message: `Your ${usage.plan} plan allows only ${allowedOriginsLimit} allowed origin(s). Upgrade to Pro for unlimited origins.`
+                });
+            }
+            updates.allowed_origins = allowedOrigins;
+        }
+
         if (targetUrl !== undefined) updates.target_url = targetUrl;
         if (isActive !== undefined) updates.is_active = isActive;
         if (timezone) updates.timezone = timezone;
@@ -236,6 +266,25 @@ exports.updateProject = async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // Log Activity
+        if (isActive !== undefined) {
+            await ActivityLogService.log(
+                projectId,
+                userId,
+                'Project Disabled',
+                `Manual suspension by project owner. Reason: User action`,
+                isActive ? 'success' : 'warning'
+            );
+        } else if (Object.keys(updates).length > 0) {
+            await ActivityLogService.log(
+                projectId,
+                userId,
+                'Settings Updated',
+                'Project settings were updated',
+                'success'
+            );
+        }
 
         // Notify user
         await NotificationService.create(
@@ -549,6 +598,17 @@ exports.togglePin = async (req, res) => {
 
         if (fetchError || !project) {
             return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Log general settings update if not just status change
+        if (Object.keys(updates).length > 0 && (isActive === undefined || Object.keys(updates).length > 1)) {
+            await ActivityLogService.log(
+                project.id,
+                req.user.id,
+                'Settings Updated',
+                'Project settings were updated',
+                'success'
+            );
         }
 
         const { data: updatedProject, error: updateError } = await supabase

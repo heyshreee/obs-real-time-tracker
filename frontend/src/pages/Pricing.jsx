@@ -44,10 +44,10 @@ export default function Pricing() {
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 10k events/mo
+                                    <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 10 Projects
+                                    <Check className="h-4 w-4 text-green-500" /> 5 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> Basic Analytics
@@ -68,13 +68,16 @@ export default function Pricing() {
                             </div>
                             <ul className="space-y-4 mb-8 flex-1">
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 500k events/mo
+                                    <Check className="h-4 w-4 text-white" /> 100,000 events/mo
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Unlimited Projects
+                                    <Check className="h-4 w-4 text-white" /> 100 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> AI-Powered Insights
+                                </li>
+                                <li className="flex items-center gap-3 text-white text-sm">
+                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
                                 </li>
                                 <li className="flex items-center gap-3 text-white text-sm">
                                     <Check className="h-4 w-4 text-white" /> Email Notifications
@@ -96,7 +99,7 @@ export default function Pricing() {
                                     <Check className="h-4 w-4 text-green-500" /> Custom volume
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Unlimited Projects
+                                    <Check className="h-4 w-4 text-green-500" /> 1,000 Projects
                                 </li>
                                 <li className="flex items-center gap-3 text-slate-300 text-sm">
                                     <Check className="h-4 w-4 text-green-500" /> Advanced AI Models
