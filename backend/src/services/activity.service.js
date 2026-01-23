@@ -21,17 +21,9 @@ class ActivityLogService {
                 details,
                 status,
                 ip_address: ip,
-                event_type: metadata.event_type || 'activity',
                 session_id: metadata.session_id,
                 resource: metadata.resource,
-                http_method: metadata.http_method,
-                http_status: metadata.http_status,
-                latency_ms: metadata.latency_ms,
-                country: metadata.country,
-                city: metadata.city,
                 user_agent: metadata.user_agent,
-                request_id: metadata.request_id || `req_${crypto.randomBytes(4).toString('hex')}`,
-                plan: metadata.plan,
                 created_at: new Date().toISOString()
             };
 

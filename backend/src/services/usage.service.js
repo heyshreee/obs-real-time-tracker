@@ -106,7 +106,8 @@ exports.calculateUsage = async (userId) => {
         plan,
         projectLimit: limits.projectLimit,
         liveLogs: limits.liveLogs,
-        emailIntegrity: limits.emailIntegrity
+        emailIntegrity: limits.emailIntegrity,
+        allowedOriginsLimit: limits.allowedOriginsLimit
     };
 };
 

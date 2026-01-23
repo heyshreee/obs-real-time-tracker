@@ -21,8 +21,9 @@ const trackingCors = async (req, res, next) => {
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma');
         res.header('Access-Control-Allow-Credentials', 'true');
 
-        // If no origin (server-to-server) or "null" origin, allow
-        if (!origin || origin === 'null') {
+        // If no origin (server-to-server), allow. 
+        // We removed 'null' check so that file:// or sandboxed requests are validated against allowed_origins.
+        if (!origin) {
             return next();
         }
 
@@ -59,21 +60,24 @@ const trackingCors = async (req, res, next) => {
                 // The user wants "not to enter into the activity logs" when disabled.
                 if (project.is_active === false) {
                     // Log disabled project attempt as failure
-                    await ActivityLogService.log(
-                        project.id,
-                        project.user_id,
-                        'project.blocked',
-                        `Request blocked: Project is disabled`,
-                        'failure',
-                        ip,
-                        {
-                            resource: req.originalUrl,
-                            http_method: req.method,
-                            http_status: 403,
-                            user_agent: req.headers['user-agent'],
-                            event_type: 'project.blocked'
-                        }
-                    );
+                    if (project.user_id) {
+                        await ActivityLogService.log(
+                            project.id,
+                            project.user_id,
+                            'project.blocked',
+                            `Request blocked: Project is disabled`,
+                            'failure',
+                            ip,
+                            {
+                                resource: req.originalUrl,
+                                http_method: req.method,
+                                http_status: 403,
+                                user_agent: req.headers['user-agent'],
+                                event_type: 'project.blocked',
+                                plan: project.plan || 'free'
+                            }
+                        );
+                    }
 
                     // We'll allow it to pass to the controller which will return 403 without logging
                     // OR we can block it here. Let's block it here to be safe and skip logging.
@@ -83,7 +87,8 @@ const trackingCors = async (req, res, next) => {
                             message: 'Project is disabled'
                         });
                     }
-                    return next();
+                    // For OPTIONS, we must end it here to avoid falling through to next() which might be 404
+                    return res.status(204).end();
                 }
 
                 if (project.allowed_origins) {
@@ -95,20 +100,24 @@ const trackingCors = async (req, res, next) => {
                         console.log(`[CORS] Blocked: Origin ${origin} not in allowed list for project ${projectId}`);
 
                         // Log security alert as failure
-                        await ActivityLogService.log(
-                            project.id,
-                            project.user_id,
-                            'security.alert',
-                            `Blocked request from unauthorized origin: ${requestOrigin}`,
-                            'failure',
-                            ip,
-                            {
-                                resource: req.originalUrl,
-                                http_method: req.method,
-                                http_status: 403,
-                                user_agent: req.headers['user-agent']
-                            }
-                        );
+                        if (project.user_id) {
+                            await ActivityLogService.log(
+                                project.id,
+                                project.user_id,
+                                'security.alert',
+                                `Blocked request from unauthorized origin: ${requestOrigin}`,
+                                'failure',
+                                ip,
+                                {
+                                    resource: req.originalUrl,
+                                    http_method: req.method,
+                                    http_status: 403,
+                                    user_agent: req.headers['user-agent'],
+                                    event_type: 'security.alert',
+                                    plan: project.plan || 'free'
+                                }
+                            );
+                        }
 
                         // Explicitly block if origins are set but don't match
                         if (req.method !== 'OPTIONS') {
@@ -117,6 +126,8 @@ const trackingCors = async (req, res, next) => {
                                 message: 'Origin not allowed in project settings'
                             });
                         }
+                        // For OPTIONS, we return 204 but WITHOUT the Allow-Origin header, effectively blocking it
+                        return res.status(204).end();
                     }
                 } else {
                     // No specific origins set -> Allow All (SaaS default for tracking)

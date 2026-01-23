@@ -90,21 +90,23 @@ exports.trackVisitor = async (req, res) => {
             .single();
 
         if (project.is_active === false) {
-            await ActivityLogService.log(
-                project.id,
-                project.user_id,
-                'visitor.blocked',
-                `Tracking attempt blocked: Project is disabled`,
-                'failure',
-                ip,
-                {
-                    resource: pageUrl,
-                    http_method: req.method,
-                    http_status: 403,
-                    user_agent: userAgent,
-                    event_type: 'visitor.blocked'
-                }
-            );
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.blocked',
+                    `Tracking attempt blocked: Project is disabled`,
+                    'failure',
+                    ip,
+                    {
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 403,
+                        user_agent: userAgent,
+                        event_type: 'visitor.blocked'
+                    }
+                );
+            }
             return res.status(403).json({ error: 'Project is disabled' });
         }
 
@@ -218,26 +220,28 @@ exports.trackVisitor = async (req, res) => {
             }
 
             // Log Activity for New Visitor (Internal)
-            await ActivityLogService.log(
-                project.id,
-                project.user_id,
-                'visitor.new',
-                `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
-                'success',
-                ip,
-                {
-                    session_id: sessionId || hitHash.substring(0, 20),
-                    resource: pageUrl,
-                    http_method: req.method,
-                    http_status: 200,
-                    latency_ms: Date.now() - req._startTime || 0,
-                    country,
-                    city,
-                    user_agent: userAgent,
-                    event_type: 'visitor.new',
-                    plan: project.plan || 'free'
-                }
-            );
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.new',
+                    `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
+                    'success',
+                    ip,
+                    {
+                        session_id: sessionId || hitHash.substring(0, 20),
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 200,
+                        latency_ms: Date.now() - req._startTime || 0,
+                        country,
+                        city,
+                        user_agent: userAgent,
+                        event_type: 'visitor.new',
+                        plan: project.plan || 'free'
+                    }
+                );
+            }
         }
 
         res.json({ success: true });
@@ -496,21 +500,23 @@ exports.trackVisitorPublic = async (req, res) => {
         }
 
         if (project.is_active === false) {
-            await ActivityLogService.log(
-                project.id,
-                project.user_id,
-                'visitor.blocked',
-                `Tracking attempt blocked: Project is disabled`,
-                'failure',
-                ip,
-                {
-                    resource: pageUrl,
-                    http_method: req.method,
-                    http_status: 403,
-                    user_agent: userAgent,
-                    event_type: 'visitor.blocked'
-                }
-            );
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.blocked',
+                    `Tracking attempt blocked: Project is disabled`,
+                    'failure',
+                    ip,
+                    {
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 403,
+                        user_agent: userAgent,
+                        event_type: 'visitor.blocked'
+                    }
+                );
+            }
             return res.status(403).json({ error: 'Project is disabled' });
         }
 
@@ -518,7 +524,12 @@ exports.trackVisitorPublic = async (req, res) => {
         const origin = req.headers['origin'] || req.headers['referer'];
         if (project.allowed_origins && project.allowed_origins.length > 0 && origin) {
             try {
-                const originHostname = new URL(origin).hostname;
+                let originHostname;
+                if (origin === 'null') {
+                    originHostname = 'null';
+                } else {
+                    originHostname = new URL(origin).hostname;
+                }
                 const allowedOriginsArray = project.allowed_origins.split(',').map(o => {
                     try {
                         // If it's a full URL, extract the hostname
@@ -542,6 +553,26 @@ exports.trackVisitorPublic = async (req, res) => {
                         `Blocked request from unauthorized origin: ${originHostname} for project "${project.name || 'Unknown'}"`,
                         'security'
                     );
+
+                    // Log security alert as failure
+                    if (project.user_id) {
+                        await ActivityLogService.log(
+                            project.id,
+                            project.user_id,
+                            'security.alert',
+                            `Blocked request from unauthorized origin: ${originHostname}`,
+                            'failure',
+                            ip,
+                            {
+                                resource: pageUrl,
+                                http_method: req.method,
+                                http_status: 403,
+                                user_agent: userAgent,
+                                event_type: 'security.alert'
+                            }
+                        );
+                    }
+
                     return res.status(403).json({ error: 'ORIGIN_NOT_ALLOWED' });
                 }
             } catch (urlError) {
@@ -668,26 +699,28 @@ exports.trackVisitorPublic = async (req, res) => {
             }
 
             // Log Activity for New Visitor
-            await ActivityLogService.log(
-                project.id,
-                null,
-                'visitor.new',
-                `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
-                'success',
-                ip,
-                {
-                    session_id: sessionId,
-                    resource: pageUrl,
-                    http_method: req.method,
-                    http_status: 200,
-                    latency_ms: Date.now() - req._startTime || 0,
-                    country,
-                    city,
-                    user_agent: userAgent,
-                    event_type: 'visitor.new',
-                    plan: 'free'
-                }
-            );
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.new',
+                    `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
+                    'success',
+                    ip,
+                    {
+                        session_id: sessionId,
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 200,
+                        latency_ms: Date.now() - req._startTime || 0,
+                        country,
+                        city,
+                        user_agent: userAgent,
+                        event_type: 'visitor.new',
+                        plan: 'free'
+                    }
+                );
+            }
 
             // Fetch the updated count to return to the frontend
             const { data: counter } = await supabase
@@ -915,16 +948,15 @@ exports.getProjectDetailedStats = async (req, res) => {
         res.json({
             realTimeVisitors: realTimeVisitors || 0,
             trafficData,
-            recentActivity: activityList,
+            activityList,
             topReferrers,
             uniqueVisitors: uniqueVisitors || 0,
             deviceStats,
-            topPages,
-            avgSessionDuration: "2m 45s"
+            topPages
         });
 
     } catch (error) {
-        console.error('Get project detailed stats error:', error);
+        console.error('Project detailed stats error:', error);
         res.status(500).json({ error: 'Failed to fetch project stats' });
     }
 };

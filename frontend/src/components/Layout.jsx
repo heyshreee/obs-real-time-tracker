@@ -35,7 +35,8 @@ export default function Layout() {
         plan: 'free',
         projectLimit: 5,
         liveLogs: false,
-        emailIntegrity: false
+        emailIntegrity: false,
+        allowedOriginsLimit: 1
     });
     const location = useLocation();
     const navigate = useNavigate();
@@ -46,6 +47,11 @@ export default function Layout() {
 
     useEffect(() => {
         loadUser();
+    }, []);
+
+    useEffect(() => {
+        if (!user) return;
+
         loadSidebarData();
 
         // Socket connection (Skip on Vercel)
@@ -98,7 +104,7 @@ export default function Layout() {
                 }, 10);
             }
         };
-    }, [user?.id]);
+    }, [user]);
 
     const loadUser = async () => {
         try {
