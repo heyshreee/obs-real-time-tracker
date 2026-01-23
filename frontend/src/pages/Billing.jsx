@@ -133,12 +133,7 @@ export default function Billing() {
                 theme: {
                     color: "#2563EB"
                 },
-                modal: {
-                    ondismiss: function () {
-                        setLoading(false);
-                        showToast('Payment cancelled', 'info');
-                    }
-                }
+
             };
 
             const paymentObject = new window.Razorpay(options);

@@ -25,6 +25,9 @@ const Documentation = lazy(() => import('./pages/Documentation'));
 const Community = lazy(() => import('./pages/Community'));
 const HelpCenter = lazy(() => import('./pages/HelpCenter'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const GoogleCallback = lazy(() => import('./pages/GoogleCallback'));
 import { ToastProvider } from './context/ToastContext';
 import { isAuthenticated } from './utils/auth';
 import './App.css';
@@ -45,6 +48,9 @@ function App() {
                                 <Route path="/share/:shareToken" element={<ShareReport />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
+                                <Route path="/verify-email" element={<VerifyEmail />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
+                                <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
 
 
