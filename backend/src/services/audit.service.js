@@ -17,14 +17,18 @@ const logAction = async (userId, action, metadata = {}) => {
             });
 
         if (error) {
+            // Foreign key violation (User doesn't exist in public.users yet)
+            if (error.code === '23503') {
+                console.warn(`[Audit] Skipped log for non-existent user: ${userId}`);
+                return;
+            }
+
             // If table is missing, log a more helpful message once
             if (error.code === 'PGRST205' || error.code === '42P01') {
                 console.warn('⚠️ Audit logs table is missing. Please run the migration script in backend/database/migrations/');
             } else {
                 console.error('Audit log error:', error.message);
             }
-        } else {
-            // console.log(`Audit log created: ${action} for user ${userId}`);
         }
     } catch (err) {
         // Silent fail for audit logs to avoid crashing the main flow

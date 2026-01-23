@@ -8,7 +8,8 @@ const PLAN_LIMITS = {
         projectLimit: 5,
         liveLogs: false,
         emailIntegrity: false,
-        allowedOriginsLimit: 1
+        allowedOriginsLimit: 1,
+        amount: 0
     },
     pro: {
         monthlyViews: 100000,
@@ -16,7 +17,8 @@ const PLAN_LIMITS = {
         projectLimit: 100,
         liveLogs: true,
         emailIntegrity: true,
-        allowedOriginsLimit: 10
+        allowedOriginsLimit: 10,
+        amount: 29
     },
     enterprise: {
         monthlyViews: 1000000000, // Effectively unlimited
@@ -24,7 +26,8 @@ const PLAN_LIMITS = {
         projectLimit: 1000,
         liveLogs: true,
         emailIntegrity: true,
-        allowedOriginsLimit: 999
+        allowedOriginsLimit: 999,
+        amount: 'custom'
     }
 };
 

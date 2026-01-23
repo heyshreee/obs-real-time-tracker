@@ -35,11 +35,15 @@ class ActivityLogService {
                 .single();
 
             if (error) {
-                // If columns don't exist yet, we might need to handle it or just log the error
-                // For now, we assume the DB is updated or we'll handle the error
-                console.error('Supabase insert error:', error.message);
-                // Fallback: try inserting without new columns if it fails due to missing columns
-                if (error.code === 'PGRST204' || error.message.includes('column')) {
+                // Check for specific errors
+                if (error.code === '23503') { // Foreign key violation
+                    console.warn(`[ActivityLog] Skipped log for non-existent user/project: ${error.details}`);
+                    return false;
+                }
+
+                // If columns don't exist yet (schema mismatch), try fallback
+                if (error.code === 'PGRST204' || error.message.includes('column') || error.code === '42703') {
+                    // console.warn('[ActivityLog] Schema mismatch, trying fallback insert...');
                     const { error: fallbackError } = await supabase
                         .from('activity_logs')
                         .insert({
@@ -51,7 +55,14 @@ class ActivityLogService {
                             ip_address: ip,
                             created_at: new Date().toISOString()
                         });
-                    if (fallbackError) throw fallbackError;
+
+                    if (fallbackError) {
+                        if (fallbackError.code === '23503') {
+                            console.warn(`[ActivityLog] Skipped fallback log for non-existent user/project`);
+                            return false;
+                        }
+                        throw fallbackError;
+                    }
                 } else {
                     throw error;
                 }

@@ -26,5 +26,6 @@ router.use('/usage', usageRoutes);
 
 router.use('/notifications', require('./notification.routes'));
 router.use('/activity', require('./activity.routes'));
+router.use('/payment', require('./payment.routes'));
 
 module.exports = router;
