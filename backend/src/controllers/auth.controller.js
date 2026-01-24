@@ -120,6 +120,16 @@ exports.login = async (req, res) => {
             }
         );
 
+        // Send New Login Email
+        const loginDetails = {
+            time: new Date().toLocaleString(),
+            ip: req.ip,
+            location: 'Unknown Location', // GeoIP lookup would go here
+            device: req.headers['user-agent']
+        };
+        // Don't await to avoid blocking response
+        EmailService.sendNewLoginEmail(user.email, loginDetails, user.name || 'User').catch(console.error);
+
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -332,6 +342,11 @@ exports.resetPassword = async (req, res) => {
         const { logAction } = require('../services/audit.service');
         await logAction(userId, 'USER_PASSWORD_RESET');
 
+        // Send Password Changed Email
+        const date = new Date().toLocaleDateString();
+        const time = new Date().toLocaleTimeString();
+        EmailService.sendPasswordChangedEmail(decoded.email || 'User', date, time, 'User').catch(console.error);
+
         res.json({ success: true, message: 'Password reset successfully' });
     } catch (error) {
         console.error('Reset password error:', error);
@@ -381,6 +396,15 @@ exports.googleLogin = async (req, res) => {
             if (!user.google_id) {
                 await supabase.from('users').update({ google_id: googleId, is_verified: true }).eq('id', user.id);
             }
+
+            // Send New Login Email for existing users
+            const loginDetails = {
+                time: new Date().toLocaleString(),
+                ip: req.ip,
+                location: 'Unknown Location',
+                device: req.headers['user-agent']
+            };
+            EmailService.sendNewLoginEmail(user.email, loginDetails, user.name || 'User').catch(console.error);
         } else {
             // Create new user
             const { data: newUser, error } = await supabase

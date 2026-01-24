@@ -95,6 +95,12 @@ exports.calculateUsage = async (userId) => {
         .eq('id', userId)
         .then(({ error }) => {
             if (error) console.error('Failed to update storage stats in supabase:', error);
+        })
+        .catch(err => {
+            // Suppress timeout errors in background tasks
+            if (err.code !== 'UND_ERR_CONNECT_TIMEOUT') {
+                console.error('Failed to update storage stats in supabase:', err);
+            }
         });
     return {
         totalViews,

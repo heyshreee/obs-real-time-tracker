@@ -23,6 +23,7 @@
     "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "pdfkit": "^0.17.2",
     "razorpay": "^2.9.6",
     "resend": "^6.7.0",
     "socket.io": "^4.8.3",

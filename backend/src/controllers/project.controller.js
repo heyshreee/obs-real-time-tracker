@@ -3,6 +3,7 @@ const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
 const NotificationService = require('../services/notification.service');
 const ActivityLogService = require('../services/activity.service');
+const EmailService = require('../services/email.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -544,6 +545,17 @@ exports.regenerateShareToken = async (req, res) => {
             `A new public report link has been generated for project "${updatedProject.name || 'Unknown'}".`,
             'activity'
         );
+
+        // Send Report Ready Email
+        const reportName = `${updatedProject.name} - Public Report`;
+        const period = 'Last 30 Days'; // Default period
+        const date = new Date().toLocaleString();
+
+        // Get user email to send report
+        const { data: user } = await supabase.from('users').select('email, name').eq('id', userId).single();
+        if (user) {
+            EmailService.sendReportReadyEmail(user.email, reportName, period, date, user.name || 'User').catch(console.error);
+        }
 
         res.json({ share_token: updatedProject.share_token });
     } catch (error) {

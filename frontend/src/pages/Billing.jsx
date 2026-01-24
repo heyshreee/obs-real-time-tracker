@@ -18,11 +18,49 @@ export default function Billing() {
         plan: 'free',
         projectLimit: 5
     });
+    const [paymentHistory, setPaymentHistory] = useState([]);
 
     useEffect(() => {
         loadStats();
         loadUsage();
+        loadPaymentHistory();
     }, []);
+
+    const loadPaymentHistory = async () => {
+        try {
+            const history = await apiRequest('/payment/history');
+            setPaymentHistory(history);
+        } catch (err) {
+            console.error('Failed to load payment history:', err);
+        }
+    };
+
+    const handleDownloadReceipt = async (paymentId) => {
+        try {
+            // Trigger download by opening in new window or creating blob
+            // Since our API returns a stream, we can use fetch and blob
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/payment/receipt/${paymentId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Download failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `receipt_${paymentId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            showToast('Failed to download receipt', 'error');
+        }
+    };
 
     const loadStats = async () => {
         try {
@@ -144,6 +182,41 @@ export default function Billing() {
             showToast('Failed to initiate payment', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDowngrade = async () => {
+        if (!window.confirm('Are you sure you want to downgrade to the Free plan? You will lose access to Pro features.')) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await apiRequest('/payment/downgrade', {
+                method: 'POST',
+                body: JSON.stringify({ planId: 'free' })
+            });
+
+            showToast('Plan downgraded successfully', 'success');
+            loadUsage();
+            if (loadUser) loadUser();
+        } catch (error) {
+            console.error('Downgrade error:', error);
+            showToast('Failed to downgrade plan', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEmailReceipt = async (paymentId) => {
+        try {
+            await apiRequest(`/payment/receipt/${paymentId}/email`, {
+                method: 'POST'
+            });
+            showToast('Receipt sent to your email', 'success');
+        } catch (error) {
+            console.error('Email receipt error:', error);
+            showToast('Failed to send receipt email', 'error');
         }
     };
 
@@ -281,10 +354,11 @@ export default function Billing() {
                         </div>
 
                         <button
-                            disabled={usageStats.plan === 'free'}
+                            onClick={handleDowngrade}
+                            disabled={usageStats.plan === 'free' || loading}
                             className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
                         >
-                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade'}
+                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade to Free'}
                         </button>
                     </div>
 
@@ -399,20 +473,46 @@ export default function Billing() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/30">
-                                {/* Placeholder row if no history */}
-                                <tr className="group hover:bg-slate-800/10 transition-colors">
-                                    <td className="px-8 py-6 text-sm font-medium text-slate-300">INV-2024-001</td>
-                                    <td className="px-8 py-6 text-sm text-slate-400">Jan 01, 2024</td>
-                                    <td className="px-8 py-6 text-sm font-bold text-white">$0.00</td>
-                                    <td className="px-8 py-6">
-                                        <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">Paid</span>
-                                    </td>
-                                    <td className="px-8 py-6 text-right">
-                                        <button className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all">
-                                            <Download className="h-4 w-4" />
-                                        </button>
-                                    </td>
-                                </tr>
+                                {paymentHistory.length === 0 ? (
+                                    <tr className="group hover:bg-slate-800/10 transition-colors">
+                                        <td colSpan="5" className="px-8 py-6 text-sm text-slate-400 text-center">
+                                            No payment history found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paymentHistory.map((payment) => (
+                                        <tr key={payment.id} className="group hover:bg-slate-800/10 transition-colors">
+                                            <td className="px-8 py-6 text-sm font-medium text-slate-300">{payment.id}</td>
+                                            <td className="px-8 py-6 text-sm text-slate-400">
+                                                {new Date(payment.date).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-8 py-6 text-sm font-bold text-white">${payment.amount}</td>
+                                            <td className="px-8 py-6">
+                                                <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">
+                                                    {payment.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleEmailReceipt(payment.id)}
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                                        title="Email Receipt"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDownloadReceipt(payment.id)}
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                                        title="Download Receipt"
+                                                    >
+                                                        <Download className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
