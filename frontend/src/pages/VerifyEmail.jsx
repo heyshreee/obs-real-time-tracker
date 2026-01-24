@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, ArrowLeft } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -10,7 +10,16 @@ export default function VerifyEmail() {
     const [loading, setLoading] = useState(false);
     const inputRefs = useRef([]);
     const navigate = useNavigate();
+    const location = useLocation();
     const { showToast } = useToast();
+    const email = location.state?.email;
+
+    useEffect(() => {
+        if (!email) {
+            showToast('Email not found, please login again', 'error');
+            navigate('/login');
+        }
+    }, [email, navigate, showToast]);
 
     // Focus first input on mount
     useEffect(() => {
@@ -37,6 +46,13 @@ export default function VerifyEmail() {
         // Move to previous input on backspace if current is empty
         if (e.key === 'Backspace' && !otp[index] && index > 0) {
             inputRefs.current[index - 1].focus();
+        }
+        // Handle Enter key
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (otp.join('').length === 6) {
+                handleVerify(e);
+            }
         }
     };
 
@@ -67,10 +83,10 @@ export default function VerifyEmail() {
         setLoading(true);
         try {
             // Real API call
-            await apiRequest('/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });
-
-            // Simulate API call (Removed)
-            // await new Promise(resolve => setTimeout(resolve, 1500));
+            await apiRequest('/auth/verify-email', {
+                method: 'POST',
+                body: JSON.stringify({ code, email })
+            });
 
             showToast('Email verified successfully!', 'success');
             navigate('/dashboard');
@@ -83,10 +99,13 @@ export default function VerifyEmail() {
 
     const handleResend = async () => {
         try {
-            await apiRequest('/auth/resend-verification', { method: 'POST' });
+            await apiRequest('/auth/resend-verification', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
             showToast('Verification code resent', 'success');
         } catch (error) {
-            showToast('Failed to resend code', 'error');
+            showToast(error.message || 'Failed to resend code', 'error');
         }
     };
 

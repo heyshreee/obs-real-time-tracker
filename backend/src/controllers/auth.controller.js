@@ -28,12 +28,6 @@ exports.register = async (req, res) => {
 
         const passwordHash = await bcrypt.hash(password, 10);
 
-        // Note: 'name' is not in the provided SQL schema for users table, 
-        // but keeping it in the insert in case the user adds it or it's handled by Supabase Auth metadata.
-        // If strict SQL schema is enforced and 'name' column is missing, this might fail.
-        // However, user explicitly asked to ADD name to register page.
-        // I will attempt to insert it. If it fails, we might need to alter table.
-
         const { data: newUser, error } = await supabase
             .from('users')
             .insert({
@@ -73,14 +67,6 @@ exports.register = async (req, res) => {
             message: 'Registration successful. Please check your email for verification code.'
         });
 
-        res.status(201).json({
-            user: {
-                id: newUser.id,
-                email: newUser.email,
-                name: newUser.name,
-                plan: newUser.plan
-            }
-        });
     } catch (error) {
         console.error('Register error:', error);
         res.status(500).json({ error: 'Registration failed' });
@@ -142,6 +128,7 @@ exports.login = async (req, res) => {
         });
 
         res.json({
+            token,
             user: {
                 id: user.id,
                 email: user.email,
@@ -166,6 +153,7 @@ exports.getMe = async (req, res) => {
 
 exports.verifyEmail = async (req, res) => {
     try {
+        console.log('Verify Email Request Body:', req.body);
         const { code, email } = req.body; // Email is needed to find user if not authenticated
 
         if (!code || code.length !== 6) {
@@ -226,6 +214,7 @@ exports.verifyEmail = async (req, res) => {
         res.json({
             success: true,
             message: 'Email verified successfully',
+            token,
             user: {
                 id: user.id,
                 email: user.email,
@@ -241,11 +230,50 @@ exports.verifyEmail = async (req, res) => {
 };
 
 exports.resendVerification = async (req, res) => {
-    // Placeholder
-    // const { email } = req.user;
-    // const code = generateCode();
-    // await EmailService.sendVerificationEmail(email, code);
-    res.json({ success: true, message: 'Verification code sent' });
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const { data: user } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.is_verified) {
+            return res.json({ success: true, message: 'Email already verified' });
+        }
+
+        // Generate OTP
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Update user with OTP
+        const { error } = await supabase
+            .from('users')
+            .update({
+                otp_code: otpCode,
+                otp_expires_at: otpExpiresAt
+            })
+            .eq('id', user.id);
+
+        if (error) throw error;
+
+        // Send Verification Email
+        await EmailService.sendVerificationEmail(user.email, otpCode);
+
+        res.json({ success: true, message: 'Verification code sent' });
+    } catch (error) {
+        console.error('Resend verification error:', error);
+        res.status(500).json({ error: 'Failed to resend verification code' });
+    }
 };
 
 exports.forgotPassword = async (req, res) => {
@@ -313,10 +341,33 @@ exports.resetPassword = async (req, res) => {
 
 exports.googleLogin = async (req, res) => {
     try {
-        const { email, name, googleId, avatar } = req.body;
-        // In a real app, verify the ID Token from Google here using google-auth-library
+        console.log('Google Login Request Body:', req.body);
+        const { token } = req.body;
 
-        if (!email) return res.status(400).json({ error: 'Email required' });
+        if (!token) {
+            console.log('Token missing in request');
+            return res.status(400).json({ error: 'Token required' });
+        }
+
+        // Verify token and get user info from Google
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            console.log('Google UserInfo failed:', response.status, response.statusText);
+            return res.status(401).json({ error: 'Invalid Google token' });
+        }
+
+        const googleUser = await response.json();
+        console.log('Google User Info:', googleUser);
+
+        const { email, name, sub: googleId, picture: avatar } = googleUser;
+
+        if (!email) {
+            console.log('Email missing in Google User Info');
+            return res.status(400).json({ error: 'Email required from Google' });
+        }
 
         // Check if user exists
         let { data: user } = await supabase
@@ -353,9 +404,9 @@ exports.googleLogin = async (req, res) => {
             await EmailService.sendWelcomeEmail(user.email, user.name || 'User');
         }
 
-        const token = generateToken(user.id);
+        const jwtToken = generateToken(user.id);
 
-        res.cookie('token', token, {
+        res.cookie('token', jwtToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
@@ -363,6 +414,7 @@ exports.googleLogin = async (req, res) => {
         });
 
         res.json({
+            token: jwtToken,
             user: {
                 id: user.id,
                 email: user.email,

@@ -19,7 +19,7 @@ class EmailService {
                         <h1>Welcome, ${name}!</h1>
                         <p>We're excited to have you on board. OBS Tracker helps you monitor your visitors in real-time.</p>
                         <p>Get started by creating your first project.</p>
-                        <a href="${process.env.FRONTEND_URL}/dashboard" style="background-color: #2563EB; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Dashboard</a>
+                        <a href="${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/dashboard" style="background-color: #2563EB; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Dashboard</a>
                     </div>
                 `
             });

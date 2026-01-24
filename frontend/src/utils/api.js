@@ -27,8 +27,10 @@ export async function apiRequest(endpoint, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+    const error = new Error(errorData.error || 'Request failed');
+    error.data = errorData;
+    throw error;
   }
 
   if (response.status === 204) {
