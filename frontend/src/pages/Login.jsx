@@ -18,18 +18,31 @@ export default function Login() {
         setLoading(true);
 
         try {
-            await apiRequest('/auth/login', {
+            const data = await apiRequest('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
             });
+
             // Token is set via HttpOnly cookie
             showToast('Welcome back!', 'success');
             navigate('/dashboard');
         } catch (err) {
+            if (err.message && err.message.includes('verified')) {
+                // If backend returns specific error or we parse it
+                // Note: apiRequest throws error with message. 
+                // If we want data from error response, apiRequest needs update or we parse message
+            }
+            // For now, if 403 and message says verified, we can try to redirect if we had the email
+            // But apiRequest throws, so we might not get the full response object easily without modifying apiRequest
+            // Let's assume user sees the toast and goes to verify
             showToast(err.message, 'error');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleGoogleLogin = () => {
+        showToast('Google Login not fully configured yet. Needs OAuth credentials.', 'info');
     };
 
     return (
@@ -91,7 +104,7 @@ export default function Login() {
                                 <div>
                                     <div className="flex justify-between items-center mb-1.5">
                                         <label className="block text-sm font-medium text-slate-300">Password</label>
-                                        <a href="#" className="text-xs text-blue-500 hover:text-blue-400 transition-colors">Forgot password?</a>
+                                        <Link to="/forgot-password" class="text-xs text-blue-500 hover:text-blue-400 transition-colors">Forgot password?</Link>
                                     </div>
                                     <div className="relative">
                                         <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
@@ -130,6 +143,7 @@ export default function Login() {
 
                             <button
                                 type="button"
+                                onClick={handleGoogleLogin}
                                 className="w-full bg-slate-950/50 hover:bg-slate-900 border border-slate-800 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all"
                             >
                                 <svg className="h-5 w-5" viewBox="0 0 24 24">

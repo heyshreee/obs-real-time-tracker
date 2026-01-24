@@ -14,7 +14,7 @@ const PLAN_LIMITS = {
     pro: {
         monthlyViews: 100000,
         storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 100,
+        projectLimit: 10,
         liveLogs: true,
         emailIntegrity: true,
         allowedOriginsLimit: 10,
@@ -23,7 +23,7 @@ const PLAN_LIMITS = {
     enterprise: {
         monthlyViews: 1000000000, // Effectively unlimited
         storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
-        projectLimit: 1000,
+        projectLimit: 100,
         liveLogs: true,
         emailIntegrity: true,
         allowedOriginsLimit: 999,

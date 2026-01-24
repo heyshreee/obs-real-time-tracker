@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const ActivityLogService = require('../services/activity.service');
 const { getPlanLimits } = require('../services/usage.service');
+const EmailService = require('../services/email.service');
 
 exports.createOrder = async (req, res) => {
     try {
@@ -85,6 +86,19 @@ exports.verifyPayment = async (req, res) => {
                     order_id: razorpay_order_id
                 }
             );
+
+            // Send Payment Receipt Email
+            if (req.user && req.user.email) {
+                const planLimits = getPlanLimits(planId);
+                const amount = planLimits.amount;
+
+                await EmailService.sendPaymentSuccessEmail(
+                    req.user.email,
+                    planId,
+                    amount, // Amount is already in currency unit (e.g., 29), not paise
+                    null // Receipt URL if available
+                );
+            }
 
             res.json({ success: true, message: 'Payment verified and plan updated' });
         } else {

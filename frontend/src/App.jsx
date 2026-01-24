@@ -26,6 +26,7 @@ const Community = lazy(() => import('./pages/Community'));
 const HelpCenter = lazy(() => import('./pages/HelpCenter'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const GoogleCallback = lazy(() => import('./pages/GoogleCallback'));
 import { ToastProvider } from './context/ToastContext';
@@ -49,6 +50,7 @@ function App() {
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
                                 <Route path="/verify-email" element={<VerifyEmail />} />
+                                <Route path="/forgot-password" element={<ForgotPassword />} />
                                 <Route path="/reset-password" element={<ResetPassword />} />
                                 <Route path="/auth/google/callback" element={<GoogleCallback />} />
 

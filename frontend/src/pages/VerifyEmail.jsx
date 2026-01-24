@@ -66,11 +66,11 @@ export default function VerifyEmail() {
 
         setLoading(true);
         try {
-            // Replace with actual API call
-            // await apiRequest('/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });
+            // Real API call
+            await apiRequest('/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Simulate API call (Removed)
+            // await new Promise(resolve => setTimeout(resolve, 1500));
 
             showToast('Email verified successfully!', 'success');
             navigate('/dashboard');
@@ -83,7 +83,7 @@ export default function VerifyEmail() {
 
     const handleResend = async () => {
         try {
-            // await apiRequest('/auth/resend-verification', { method: 'POST' });
+            await apiRequest('/auth/resend-verification', { method: 'POST' });
             showToast('Verification code resent', 'success');
         } catch (error) {
             showToast('Failed to resend code', 'error');

@@ -19,11 +19,18 @@ export default function Register() {
         setLoading(true);
 
         try {
-            await apiRequest('/auth/register', {
+            const data = await apiRequest('/auth/register', {
                 method: 'POST',
                 body: JSON.stringify({ name, email, password }),
             });
-            // Auto-login after registration
+
+            if (data.requireVerification) {
+                showToast(data.message || 'Please verify your email', 'success');
+                navigate('/verify-email', { state: { email: data.email } });
+                return;
+            }
+
+            // Auto-login after registration (fallback if no verification needed)
             await apiRequest('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
@@ -36,6 +43,13 @@ export default function Register() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleGoogleLogin = () => {
+        // Redirect to Google OAuth URL (Backend should handle this or use a library)
+        // For now, we'll simulate or use a placeholder
+        // Ideally: window.location.href = 'http://localhost:3000/api/v1/auth/google';
+        showToast('Google Login not fully configured yet. Needs OAuth credentials.', 'info');
     };
 
     return (
@@ -148,6 +162,7 @@ export default function Register() {
 
                             <button
                                 type="button"
+                                onClick={handleGoogleLogin}
                                 className="w-full bg-slate-950/50 hover:bg-slate-900 border border-slate-800 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all"
                             >
                                 <svg className="h-5 w-5" viewBox="0 0 24 24">
