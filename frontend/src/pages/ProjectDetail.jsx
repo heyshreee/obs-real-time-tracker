@@ -1187,7 +1187,23 @@ export default function Tracker() {
             />
             <CopyButton text={`${window.location.origin}/share/${shareToken}`} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            {shareToken && (
+              <button
+                onClick={async () => {
+                  try {
+                    await apiRequest(`/projects/${project.id}/share-token`, { method: 'DELETE' });
+                    setShareToken(null);
+                    showToast('Sharing disabled', 'success');
+                  } catch (err) {
+                    showToast('Failed to disable sharing', 'error');
+                  }
+                }}
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+              >
+                <X className="h-3 w-3" /> Disable Sharing
+              </button>
+            )}
             <button
               onClick={async () => {
                 try {
@@ -1200,7 +1216,7 @@ export default function Tracker() {
               }}
               className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
-              <RefreshCw className="h-3 w-3" /> Regenerate Link
+              <RefreshCw className="h-3 w-3" /> {shareToken ? 'Regenerate Link' : 'Generate Link'}
             </button>
           </div>
         </div>

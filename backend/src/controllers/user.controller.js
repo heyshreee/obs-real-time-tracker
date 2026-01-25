@@ -2,6 +2,13 @@ const supabase = require('../config/supabase');
 const bcrypt = require('bcryptjs');
 const usageService = require('../services/usage.service');
 const ActivityLogService = require('../services/activity.service');
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 exports.getUsageStats = async (req, res) => {
     try {
@@ -48,6 +55,52 @@ exports.updateProfile = async (req, res) => {
     } catch (error) {
         console.error('Update profile error:', error);
         res.status(500).json({ error: 'Failed to update profile' });
+    }
+};
+
+exports.updateAvatar = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        // Upload to Cloudinary
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        let dataURI = "data:" + file.mimetype + ";base64," + b64;
+
+        const result = await cloudinary.uploader.upload(dataURI, {
+            folder: 'obs-tracker/avatars',
+            public_id: `user_${userId}`,
+            overwrite: true,
+            transformation: [{ width: 400, height: 400, crop: 'fill' }]
+        });
+
+        // Update Supabase
+        const { data, error } = await supabase
+            .from('users')
+            .update({ avatar_url: result.secure_url })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await ActivityLogService.log(
+            null,
+            userId,
+            'user.avatar_update',
+            'Updated profile picture',
+            'info',
+            req.ip
+        );
+
+        res.json({ success: true, avatar_url: result.secure_url });
+    } catch (error) {
+        console.error('Update avatar error:', error);
+        res.status(500).json({ error: 'Failed to update avatar' });
     }
 };
 

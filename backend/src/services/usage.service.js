@@ -9,6 +9,7 @@ const PLAN_LIMITS = {
         liveLogs: false,
         emailIntegrity: false,
         allowedOriginsLimit: 1,
+        share_report: 5,
         amount: 0
     },
     pro: {
@@ -18,6 +19,7 @@ const PLAN_LIMITS = {
         liveLogs: true,
         emailIntegrity: true,
         allowedOriginsLimit: 10,
+        share_report: 100,
         amount: 29
     },
     enterprise: {
@@ -27,6 +29,7 @@ const PLAN_LIMITS = {
         liveLogs: true,
         emailIntegrity: true,
         allowedOriginsLimit: 999,
+        share_report: Infinity,
         amount: 'custom'
     }
 };
@@ -102,6 +105,13 @@ exports.calculateUsage = async (userId) => {
                 console.error('Failed to update storage stats in supabase:', err);
             }
         });
+    // 4. Calculate Share Reports (Projects with share_token)
+    const { count: shareReportCount } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('share_token', 'is', null);
+
     return {
         totalViews,
         monthlyLimit: limits.monthlyViews,
@@ -116,7 +126,12 @@ exports.calculateUsage = async (userId) => {
         projectLimit: limits.projectLimit,
         liveLogs: limits.liveLogs,
         emailIntegrity: limits.emailIntegrity,
-        allowedOriginsLimit: limits.allowedOriginsLimit
+        allowedOriginsLimit: limits.allowedOriginsLimit,
+        share_report: {
+            used: shareReportCount || 0,
+            limit: limits.share_report
+        },
+        projectCount: projects?.length || 0
     };
 };
 
@@ -202,6 +217,25 @@ exports.checkLimit = async (userId, type = 'track') => {
         return {
             canTrack: projectsOk,
             reason: !projectsOk ? 'Project limit reached. Upgrade to Pro.' : null,
+            usage
+        };
+    }
+
+    if (type === 'share_report') {
+        const shareReportOk = (usage.share_report.used || 0) < usage.share_report.limit;
+
+        if (!shareReportOk) {
+            await NotificationService.create(
+                userId,
+                'Plan Limit Reached',
+                `You have reached the maximum number of shared reports for your plan. Upgrade to share more.`,
+                'warning'
+            );
+        }
+
+        return {
+            canTrack: shareReportOk,
+            reason: !shareReportOk ? 'Shared report limit reached. Upgrade to Pro.' : null,
             usage
         };
     }

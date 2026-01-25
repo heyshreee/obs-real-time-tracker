@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -75,7 +75,9 @@ export default function Settings() {
 
 function ProfileSection({ user, loadUser, showToast }) {
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const fileInputRef = useRef(null);
     const [formData, setFormData] = useState({
         name: user?.name || '',
         bio: user?.bio || '',
@@ -99,6 +101,52 @@ function ProfileSection({ user, loadUser, showToast }) {
             showToast('Failed to update profile', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('File size must be less than 5MB', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        setUploading(true);
+        try {
+            // We need to use fetch directly for FormData to handle headers correctly
+            // or ensure apiRequest handles FormData (it likely expects JSON)
+            // Let's check apiRequest implementation or just use fetch with auth token
+            // Assuming apiRequest handles JSON, we might need a custom call here.
+            // But let's try to use a modified apiRequest or just fetch.
+            // Since I can't see apiRequest implementation right now, I'll assume I need to handle it.
+            // Actually, I should check apiRequest.
+            // For now, I'll implement a direct fetch with the token from localStorage/cookie if needed.
+            // But wait, apiRequest probably sets Content-Type to application/json.
+            // I'll use a direct fetch here to be safe.
+
+            const response = await fetch('/api/v1/user/avatar', {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            await loadUser();
+            showToast('Profile picture updated', 'success');
+        } catch (error) {
+            console.error(error);
+            showToast('Failed to upload image', 'error');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -138,14 +186,22 @@ function ProfileSection({ user, loadUser, showToast }) {
                     </div>
                     <div>
                         <h4 className="text-lg font-bold text-white mb-1">Profile Picture</h4>
-                        <p className="text-sm text-slate-400 mb-4">JPG, GIF or PNG. Max size 800K</p>
+                        <p className="text-sm text-slate-400 mb-4">JPG, GIF or PNG. Max size 5MB</p>
                         <div className="flex gap-3">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                            />
                             <button
-                                disabled={!isEditing}
+                                disabled={!isEditing || uploading}
+                                onClick={() => fileInputRef.current?.click()}
                                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Upload className="h-4 w-4" />
-                                Upload New
+                                {uploading ? <Loader className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                {uploading ? 'Uploading...' : 'Upload New'}
                             </button>
                             <button
                                 disabled={!isEditing}
@@ -408,6 +464,7 @@ function NotificationsSection({ user, showToast }) {
     const [isEditing, setIsEditing] = useState(false);
     const [preferences, setPreferences] = useState(user?.notification_preferences || {
         email: true,
+        email_reports: true,
         browser: true,
         security: true,
         marketing: false
@@ -450,6 +507,7 @@ function NotificationsSection({ user, showToast }) {
             <div className="space-y-6">
                 {[
                     { id: 'email', label: 'Email Notifications', desc: 'Receive daily summaries and critical alerts via email.' },
+                    { id: 'email_reports', label: 'Email Reports', desc: 'Receive weekly performance reports for your projects.' },
                     { id: 'browser', label: 'Browser Push Notifications', desc: 'Get real-time updates when you are online.' },
                     { id: 'security', label: 'Security Alerts', desc: 'Get notified about new logins and password changes.' },
                     { id: 'marketing', label: 'Product Updates', desc: 'Receive news about new features and improvements.' }
@@ -477,16 +535,15 @@ function NotificationsSection({ user, showToast }) {
     );
 }
 
-function UsageSection({ user }) {
-    const [usage, setUsage] = useState(null);
+function UsageSection() {
+    const { usageStats } = useOutletContext();
 
-    useEffect(() => {
-        apiRequest('/usage').then(setUsage).catch(console.error);
-    }, []);
+    if (!usageStats) return <Spinner />;
 
-    if (!usage) return <Spinner />;
-
-    const getPercentage = (used, limit) => Math.min((used / limit) * 100, 100);
+    const getPercentage = (used, limit) => {
+        if (limit === Infinity) return 0;
+        return Math.min((used / limit) * 100, 100);
+    };
 
     return (
         <div className="space-y-6">
@@ -494,7 +551,7 @@ function UsageSection({ user }) {
                 <div className="flex justify-between items-center mb-8">
                     <h3 className="text-xl font-bold text-white">Usage & Quota</h3>
                     <span className="px-3 py-1 bg-blue-500/10 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider border border-blue-500/20">
-                        {usage.plan} Plan
+                        {usageStats.plan} Plan
                     </span>
                 </div>
 
@@ -503,14 +560,14 @@ function UsageSection({ user }) {
                         <div className="flex justify-between items-end mb-4">
                             <div>
                                 <p className="text-sm font-medium text-slate-400">Monthly Views</p>
-                                <p className="text-2xl font-bold text-white mt-1">{usage.totalViews.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-white mt-1">{usageStats.totalViews.toLocaleString()}</p>
                             </div>
-                            <p className="text-xs text-slate-500">Limit: {usage.monthlyLimit.toLocaleString()}</p>
+                            <p className="text-xs text-slate-500">Limit: {usageStats.monthlyLimit.toLocaleString()}</p>
                         </div>
                         <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                                style={{ width: `${getPercentage(usage.totalViews, usage.monthlyLimit)}%` }}
+                                style={{ width: `${getPercentage(usageStats.totalViews, usageStats.monthlyLimit)}%` }}
                             />
                         </div>
                     </div>
@@ -519,14 +576,53 @@ function UsageSection({ user }) {
                         <div className="flex justify-between items-end mb-4">
                             <div>
                                 <p className="text-sm font-medium text-slate-400">Storage Used</p>
-                                <p className="text-2xl font-bold text-white mt-1">{(usage.storageUsed / 1024 / 1024).toFixed(2)} MB</p>
+                                <p className="text-2xl font-bold text-white mt-1">
+                                    {usageStats.storageUsed < 1024 * 1024
+                                        ? `${(usageStats.storageUsed / 1024).toFixed(2)} KB`
+                                        : usageStats.storageUsed < 1024 * 1024 * 1024
+                                            ? `${(usageStats.storageUsed / (1024 * 1024)).toFixed(2)} MB`
+                                            : `${(usageStats.storageUsed / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                                    }
+                                </p>
                             </div>
-                            <p className="text-xs text-slate-500">Limit: {(usage.storageLimit / 1024 / 1024 / 1024).toFixed(1)} GB</p>
+                            <p className="text-xs text-slate-500">Limit: {usageStats.storageLimit < 1024 * 1024 * 1024 ? `${(usageStats.storageLimit / (1024 * 1024)).toFixed(0)} MB` : `${(usageStats.storageLimit / (1024 * 1024 * 1024)).toFixed(0)} GB`}</p>
                         </div>
                         <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-purple-500 rounded-full transition-all duration-500"
-                                style={{ width: `${getPercentage(usage.storageUsed, usage.storageLimit)}%` }}
+                                style={{ width: `${getPercentage(usageStats.storageUsed, usageStats.storageLimit)}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-6">
+                        <div className="flex justify-between items-end mb-4">
+                            <div>
+                                <p className="text-sm font-medium text-slate-400">Total Projects</p>
+                                <p className="text-2xl font-bold text-white mt-1">{usageStats.projectCount}</p>
+                            </div>
+                            <p className="text-xs text-slate-500">Limit: {usageStats.projectLimit}</p>
+                        </div>
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                                style={{ width: `${getPercentage(usageStats.projectCount, usageStats.projectLimit)}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-6">
+                        <div className="flex justify-between items-end mb-4">
+                            <div>
+                                <p className="text-sm font-medium text-slate-400">Shared Reports</p>
+                                <p className="text-2xl font-bold text-white mt-1">{usageStats.share_report?.used || 0}</p>
+                            </div>
+                            <p className="text-xs text-slate-500">Limit: {usageStats.share_report?.limit === Infinity ? 'Unlimited' : usageStats.share_report?.limit}</p>
+                        </div>
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-green-500 rounded-full transition-all duration-500"
+                                style={{ width: `${getPercentage(usageStats.share_report?.used || 0, usageStats.share_report?.limit || 1)}%` }}
                             />
                         </div>
                     </div>
@@ -539,14 +635,50 @@ function UsageSection({ user }) {
 function ProjectsSection({ user }) {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isEditing, setIsEditing] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ name: '', allowedOrigins: '' });
+    const { showToast } = useToast();
 
     useEffect(() => {
+        loadProjects();
+    }, []);
+
+    const loadProjects = () => {
         apiRequest('/projects')
             .then(setProjects)
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, []);
+    };
+
+    const startEditing = (project) => {
+        setEditingId(project.id);
+        setEditForm({
+            name: project.name,
+            allowedOrigins: project.allowed_origins || ''
+        });
+    };
+
+    const cancelEditing = () => {
+        setEditingId(null);
+        setEditForm({ name: '', allowedOrigins: '' });
+    };
+
+    const handleSave = async (projectId) => {
+        try {
+            await apiRequest(`/projects/${projectId}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: editForm.name,
+                    allowedOrigins: editForm.allowedOrigins
+                })
+            });
+            showToast('Project updated successfully', 'success');
+            setEditingId(null);
+            loadProjects();
+        } catch (error) {
+            showToast(error.message || 'Failed to update project', 'error');
+        }
+    };
 
     if (loading) return <Spinner />;
 
@@ -557,20 +689,6 @@ function ProjectsSection({ user }) {
                     <h3 className="text-xl font-bold text-white">Projects & Teams</h3>
                     <p className="text-sm text-slate-500 mt-1">Manage your projects and team members.</p>
                 </div>
-                <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${isEditing
-                        ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white border-transparent'
-                        }`}
-                >
-                    {isEditing ? 'Done' : (
-                        <>
-                            <SettingsIcon className="h-4 w-4" />
-                            Edit
-                        </>
-                    )}
-                </button>
             </div>
 
             <div className="space-y-4">
@@ -581,25 +699,63 @@ function ProjectsSection({ user }) {
                 ) : (
                     projects.map((project) => (
                         <div key={project.id} className="flex items-center justify-between p-4 bg-slate-950/50 border border-slate-800 rounded-xl group hover:border-slate-700 transition-colors">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 flex-1">
                                 <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-slate-400 font-bold border border-slate-700">
                                     {project.name[0].toUpperCase()}
                                 </div>
-                                <div>
-                                    <p className="text-sm font-bold text-white">{project.name}</p>
-                                    <p className="text-xs text-slate-500">{project.domain}</p>
-                                </div>
+                                {editingId === project.id ? (
+                                    <div className="flex-1 grid gap-2">
+                                        <input
+                                            type="text"
+                                            value={editForm.name}
+                                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                                            placeholder="Project Name"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={editForm.allowedOrigins}
+                                            onChange={(e) => setEditForm({ ...editForm, allowedOrigins: e.target.value })}
+                                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+                                            placeholder="Allowed Origins (comma separated)"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-sm font-bold text-white">{project.name}</p>
+                                        <p className="text-xs text-slate-500">{project.allowed_origins || 'All origins allowed'}</p>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-4">
-                                <span className="px-2 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded uppercase tracking-wider">
-                                    Owner
-                                </span>
-                                <button
-                                    disabled={!isEditing}
-                                    className="p-2 text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                >
-                                    <Edit2 className="h-4 w-4" />
-                                </button>
+                            <div className="flex items-center gap-4 ml-4">
+                                {editingId === project.id ? (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleSave(project.id)}
+                                            className="p-2 text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
+                                        >
+                                            <Check className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={cancelEditing}
+                                            className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                        >
+                                            <LogOut className="h-4 w-4 rotate-180" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <span className="px-2 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded uppercase tracking-wider">
+                                            Owner
+                                        </span>
+                                        <button
+                                            onClick={() => startEditing(project)}
+                                            className="p-2 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                            <Edit2 className="h-4 w-4" />
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))

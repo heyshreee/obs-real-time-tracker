@@ -143,7 +143,8 @@ exports.login = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 name: user.name,
-                plan: user.plan
+                plan: user.plan,
+                avatar_url: user.avatar_url
             }
         });
     } catch (error) {
@@ -229,7 +230,8 @@ exports.verifyEmail = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 name: user.name,
-                plan: user.plan
+                plan: user.plan,
+                avatar_url: user.avatar_url
             }
         });
 
@@ -444,7 +446,7 @@ exports.googleLogin = async (req, res) => {
                 email: user.email,
                 name: user.name,
                 plan: user.plan,
-                avatar: user.avatar_url
+                avatar_url: user.avatar_url
             }
         });
 

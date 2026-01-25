@@ -19,7 +19,7 @@ import { useToast } from '../context/ToastContext';
 import { io } from 'socket.io-client';
 import Notifications from './Notifications';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000')).replace(/\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000')).replace(/\/$/, '');
 const SOCKET_URL = API_URL.replace(/\/api$/, '').replace(/\/v1$/, '');
 
 export default function Layout() {
@@ -334,7 +334,11 @@ export default function Layout() {
                                 </div>
                                 <div className="relative group">
                                     <button className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 border border-slate-500 flex items-center justify-center text-white font-bold overflow-hidden">
-                                        <User className="h-5 w-5" />
+                                        {user.avatar_url ? (
+                                            <img src={user.avatar_url} alt={user.name} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <User className="h-5 w-5" />
+                                        )}
                                     </button>
 
                                     {/* Dropdown Menu */}
