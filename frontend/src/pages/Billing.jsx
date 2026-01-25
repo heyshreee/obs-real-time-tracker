@@ -4,12 +4,14 @@ import { Check, Zap, Layers, X, ArrowUpRight, Download, CreditCard, Calendar, Cl
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 
 export default function Billing() {
     const { user, loadUser } = useOutletContext();
     const [stats, setStats] = useState(null);
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
     const [usageStats, setUsageStats] = useState({
         totalViews: 0,
         monthlyLimit: 1000,
@@ -21,9 +23,20 @@ export default function Billing() {
     const [paymentHistory, setPaymentHistory] = useState([]);
 
     useEffect(() => {
-        loadStats();
-        loadUsage();
-        loadPaymentHistory();
+        const init = async () => {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadUsage(),
+                    loadPaymentHistory()
+                ]);
+            } catch (error) {
+                console.error('Failed to load billing data:', error);
+            } finally {
+                setPageLoading(false);
+            }
+        };
+        init();
     }, []);
 
     const loadPaymentHistory = async () => {
@@ -219,6 +232,8 @@ export default function Billing() {
             showToast('Failed to send receipt email', 'error');
         }
     };
+
+    if (pageLoading) return <Spinner />;
 
     return (
         <div className="max-w-7xl mx-auto">

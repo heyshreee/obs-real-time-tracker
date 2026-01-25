@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 
 export default function Settings() {
     const { user, loadUser } = useOutletContext();
@@ -407,7 +408,7 @@ function UsageSection({ user }) {
         apiRequest('/usage').then(setUsage).catch(console.error);
     }, []);
 
-    if (!usage) return <div className="p-8 text-center text-slate-500">Loading usage stats...</div>;
+    if (!usage) return <Spinner />;
 
     const getPercentage = (used, limit) => Math.min((used / limit) * 100, 100);
 
@@ -461,10 +462,16 @@ function UsageSection({ user }) {
 
 function ProjectsSection({ user }) {
     const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiRequest('/projects').then(setProjects).catch(console.error);
+        apiRequest('/projects')
+            .then(setProjects)
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []);
+
+    if (loading) return <Spinner />;
 
     return (
         <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
