@@ -129,7 +129,10 @@ export default function ProjectDetail() {
 
       setStats(statsData);
       if (detailedStats) {
-        setOverviewStats(detailedStats);
+        setOverviewStats({
+          ...detailedStats,
+          recentActivity: detailedStats.activityList || []
+        });
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -147,7 +150,10 @@ export default function ProjectDetail() {
         apiRequest(`/analytics/projects/${projectId}/traffic?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`)
       ]);
       setStats(statsData);
-      setOverviewStats(detailedStats);
+      setOverviewStats({
+        ...detailedStats,
+        recentActivity: detailedStats.activityList || []
+      });
     } catch (err) {
       // Silent fail
     }
@@ -468,33 +474,55 @@ export default function Tracker() {
                 </div>
               </div>
               <div className="space-y-0">
-                {overviewStats.recentActivity?.map((activity, i) => (
-                  <div key={i} className="flex gap-4 relative pb-6 last:pb-0">
-                    {/* Vertical line */}
-                    {i !== overviewStats.recentActivity.length - 1 && (
-                      <div className="absolute left-[5px] top-2 bottom-0 w-px bg-slate-800"></div>
-                    )}
-                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
-                    <div>
-                      <p className="text-sm text-white truncate" title={activity.title || 'Unknown Page'}>
-                        <span className="font-medium">{activity.title || 'Unknown Page'}</span>
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                        {activity.device || 'Unknown'} - {activity.ip || 'Unknown IP'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                          <Globe className="h-3 w-3" /> {activity.location}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                {overviewStats.recentActivity?.map((activity, i) => {
+                  const getDeviceIcon = (device) => {
+                    const type = (device || 'desktop').toLowerCase();
+                    if (type === 'mobile') return <Smartphone className="h-3 w-3" />;
+                    if (type === 'tablet') return <Tablet className="h-3 w-3" />;
+                    return <Monitor className="h-3 w-3" />;
+                  };
+
+                  return (
+                    <div key={i} className="flex gap-4 relative pb-6 last:pb-0 group">
+                      {/* Vertical line */}
+                      {i !== overviewStats.recentActivity.length - 1 && (
+                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
+                      )}
+
+                      <div className={`w-6 h-6 rounded-full z-10 flex-shrink-0 flex items-center justify-center border border-slate-800 ${i === 0 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-slate-900 text-slate-500'
+                        }`}>
+                        {getDeviceIcon(activity.device)}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-white truncate font-medium" title={activity.title || 'Unknown Page'}>
+                            {activity.title || 'Unknown Page'}
+                          </p>
+                          <span className="text-[10px] text-slate-500 whitespace-nowrap flex-shrink-0">
+                            {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1.5 truncate" title={activity.path}>
+                            <Globe className="h-3 w-3 text-slate-500" />
+                            {activity.path}
+                          </span>
+                          <span className="w-1 h-1 rounded-full bg-slate-700 flex-shrink-0"></span>
+                          <span className="flex items-center gap-1.5 truncate">
+                            {activity.location}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!overviewStats.recentActivity || overviewStats.recentActivity.length === 0) && (
-                  <p className="text-center text-slate-500 text-sm py-4">No recent activity</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <Activity className="h-8 w-8 mb-3 opacity-20" />
+                    <p className="text-sm">No recent activity</p>
+                  </div>
                 )}
               </div>
             </div>

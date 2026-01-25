@@ -34,22 +34,22 @@ export default function Navbar() {
                   Home
                 </Link>
                 <Link
-                  to="/projects"
+                  to="/dashboard/projects"
                   className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
                 >
                   Projects
                 </Link>
                 <Link
-                  to="/billing"
+                  to="/dashboard/billing"
                   className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
                 >
                   Billing
                 </Link>
                 <Link
-                  to="/profile"
+                  to="/dashboard/settings"
                   className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
                 >
-                  Profile
+                  Settings
                 </Link>
                 <button
                   onClick={handleLogout}
