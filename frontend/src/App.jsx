@@ -11,8 +11,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Projects = lazy(() => import('./pages/Projects'));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
 const ProjectActivity = lazy(() => import('./pages/ProjectActivity'));
-const Profile = lazy(() => import('./pages/Profile'));
 const Billing = lazy(() => import('./pages/Billing'));
+const Settings = lazy(() => import('./pages/Settings'));
 const APIKeys = lazy(() => import('./pages/APIKeys'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Pricing = lazy(() => import('./pages/Pricing'));
@@ -25,6 +25,10 @@ const Documentation = lazy(() => import('./pages/Documentation'));
 const Community = lazy(() => import('./pages/Community'));
 const HelpCenter = lazy(() => import('./pages/HelpCenter'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const GoogleCallback = lazy(() => import('./pages/GoogleCallback'));
 import { ToastProvider } from './context/ToastContext';
 import { isAuthenticated } from './utils/auth';
 import './App.css';
@@ -45,6 +49,10 @@ function App() {
                                 <Route path="/share/:shareToken" element={<ShareReport />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/register" element={<Register />} />
+                                <Route path="/verify-email" element={<VerifyEmail />} />
+                                <Route path="/forgot-password" element={<ForgotPassword />} />
+                                <Route path="/reset-password" element={<ResetPassword />} />
+                                <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
 
 
@@ -82,19 +90,20 @@ function App() {
                                             </PrivateRoute>
                                         }
                                     />
-                                    <Route
-                                        path="/dashboard/profile"
-                                        element={
-                                            <PrivateRoute>
-                                                <Profile />
-                                            </PrivateRoute>
-                                        }
-                                    />
+
                                     <Route
                                         path="/dashboard/billing"
                                         element={
                                             <PrivateRoute>
                                                 <Billing />
+                                            </PrivateRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/dashboard/settings/:tab?"
+                                        element={
+                                            <PrivateRoute>
+                                                <Settings />
                                             </PrivateRoute>
                                         }
                                     />

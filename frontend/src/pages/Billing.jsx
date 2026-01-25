@@ -3,10 +3,15 @@ import { motion } from 'framer-motion';
 import { Check, Zap, Layers, X, ArrowUpRight, Download, CreditCard, Calendar, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import Spinner from '../components/Spinner';
 
 export default function Billing() {
-    const { user } = useOutletContext();
+    const { user, loadUser } = useOutletContext();
     const [stats, setStats] = useState(null);
+    const { showToast } = useToast();
+    const [loading, setLoading] = useState(false);
+    const [pageLoading, setPageLoading] = useState(true);
     const [usageStats, setUsageStats] = useState({
         totalViews: 0,
         monthlyLimit: 1000,
@@ -15,11 +20,60 @@ export default function Billing() {
         plan: 'free',
         projectLimit: 5
     });
+    const [paymentHistory, setPaymentHistory] = useState([]);
 
     useEffect(() => {
-        loadStats();
-        loadUsage();
+        const init = async () => {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadUsage(),
+                    loadPaymentHistory()
+                ]);
+            } catch (error) {
+                console.error('Failed to load billing data:', error);
+            } finally {
+                setPageLoading(false);
+            }
+        };
+        init();
     }, []);
+
+    const loadPaymentHistory = async () => {
+        try {
+            const history = await apiRequest('/payment/history');
+            setPaymentHistory(history);
+        } catch (err) {
+            console.error('Failed to load payment history:', err);
+        }
+    };
+
+    const handleDownloadReceipt = async (paymentId) => {
+        try {
+            // Trigger download by opening in new window or creating blob
+            // Since our API returns a stream, we can use fetch and blob
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/payment/receipt/${paymentId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Download failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `receipt_${paymentId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            showToast('Failed to download receipt', 'error');
+        }
+    };
 
     const loadStats = async () => {
         try {
@@ -61,6 +115,126 @@ export default function Billing() {
         return nextMonth.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
     };
 
+    const loadRazorpay = () => {
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
+    const handleUpgrade = async (planId) => {
+        setLoading(true);
+        try {
+            const res = await loadRazorpay();
+
+            if (!res) {
+                showToast('Razorpay SDK failed to load', 'error');
+                return;
+            }
+
+            // 1. Create Order
+            const { order } = await apiRequest('/payment/order', {
+                method: 'POST',
+                body: JSON.stringify({ planId })
+            });
+
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Enter the Key ID generated from the Dashboard
+                amount: order.amount,
+                currency: order.currency,
+                name: "OBS Tracker",
+                description: `Upgrade to ${planId} Plan`,
+                image: "https://example.com/your_logo", // You can add a logo here
+                order_id: order.id,
+                handler: async function (response) {
+                    try {
+                        // 2. Verify Payment
+                        await apiRequest('/payment/verify', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                planId
+                            })
+                        });
+
+                        showToast(`Successfully upgraded to ${planId} plan!`, 'success');
+                        loadUsage(); // Reload usage to reflect new limits
+                        if (loadUser) loadUser(); // Reload user to reflect new plan
+                    } catch (error) {
+                        showToast('Payment verification failed', 'error');
+                        console.error(error);
+                    }
+                },
+                modal: {
+                    ondismiss: function () {
+                        setLoading(false);
+                        console.log('Payment cancelled by user');
+                    }
+                },
+                prefill: {
+                    name: user?.name || '',
+                    email: user?.email || '',
+                    contact: ''
+                },
+                theme: {
+                    color: "#2563EB"
+                },
+
+            };
+
+            const paymentObject = new window.Razorpay(options);
+            paymentObject.open();
+
+        } catch (error) {
+            console.error('Payment error:', error);
+            showToast('Failed to initiate payment', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDowngrade = async () => {
+        if (!window.confirm('Are you sure you want to downgrade to the Free plan? You will lose access to Pro features.')) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await apiRequest('/payment/downgrade', {
+                method: 'POST',
+                body: JSON.stringify({ planId: 'free' })
+            });
+
+            showToast('Plan downgraded successfully', 'success');
+            loadUsage();
+            if (loadUser) loadUser();
+        } catch (error) {
+            console.error('Downgrade error:', error);
+            showToast('Failed to downgrade plan', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEmailReceipt = async (paymentId) => {
+        try {
+            await apiRequest(`/payment/receipt/${paymentId}/email`, {
+                method: 'POST'
+            });
+            showToast('Receipt sent to your email', 'success');
+        } catch (error) {
+            console.error('Email receipt error:', error);
+            showToast('Failed to send receipt email', 'error');
+        }
+    };
+
+    if (pageLoading) return <Spinner />;
+
     return (
         <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-8">
@@ -86,8 +260,11 @@ export default function Billing() {
                                 <span className="px-2.5 py-0.5 bg-slate-800 text-slate-400 text-[10px] font-bold rounded-full uppercase tracking-wider border border-slate-700">Current</span>
                             </div>
                         </div>
-                        <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95">
-                            Upgrade Now
+                        <button
+                            onClick={() => handleUpgrade('pro')}
+                            disabled={usageStats.plan === 'pro' || loading}
+                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                            {usageStats.plan === 'pro' ? 'Current Plan' : 'Upgrade Now'}
                         </button>
                     </div>
 
@@ -192,10 +369,11 @@ export default function Billing() {
                         </div>
 
                         <button
-                            disabled={usageStats.plan === 'free'}
+                            onClick={handleDowngrade}
+                            disabled={usageStats.plan === 'free' || loading}
                             className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
                         >
-                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade'}
+                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade to Free'}
                         </button>
                     </div>
 
@@ -245,7 +423,8 @@ export default function Billing() {
                         </div>
 
                         <button
-                            disabled={usageStats.plan === 'pro'}
+                            onClick={() => handleUpgrade('pro', 29)}
+                            disabled={usageStats.plan === 'pro' || loading}
                             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
                         >
                             {usageStats.plan === 'pro' ? 'Active Plan' : 'Upgrade to Pro'}
@@ -309,25 +488,51 @@ export default function Billing() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/30">
-                                {/* Placeholder row if no history */}
-                                <tr className="group hover:bg-slate-800/10 transition-colors">
-                                    <td className="px-8 py-6 text-sm font-medium text-slate-300">INV-2024-001</td>
-                                    <td className="px-8 py-6 text-sm text-slate-400">Jan 01, 2024</td>
-                                    <td className="px-8 py-6 text-sm font-bold text-white">$0.00</td>
-                                    <td className="px-8 py-6">
-                                        <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">Paid</span>
-                                    </td>
-                                    <td className="px-8 py-6 text-right">
-                                        <button className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all">
-                                            <Download className="h-4 w-4" />
-                                        </button>
-                                    </td>
-                                </tr>
+                                {paymentHistory.length === 0 ? (
+                                    <tr className="group hover:bg-slate-800/10 transition-colors">
+                                        <td colSpan="5" className="px-8 py-6 text-sm text-slate-400 text-center">
+                                            No payment history found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paymentHistory.map((payment) => (
+                                        <tr key={payment.id} className="group hover:bg-slate-800/10 transition-colors">
+                                            <td className="px-8 py-6 text-sm font-medium text-slate-300">{payment.id}</td>
+                                            <td className="px-8 py-6 text-sm text-slate-400">
+                                                {new Date(payment.date).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-8 py-6 text-sm font-bold text-white">${payment.amount}</td>
+                                            <td className="px-8 py-6">
+                                                <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">
+                                                    {payment.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleEmailReceipt(payment.id)}
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                                        title="Email Receipt"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDownloadReceipt(payment.id)}
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                                        title="Download Receipt"
+                                                    >
+                                                        <Download className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

@@ -26,7 +26,7 @@ const SOCKET_URL = API_URL.replace('/api/v1', '');
 export default function ProjectDetail() {
   const { idOrName, tab } = useParams();
   const navigate = useNavigate();
-  const { user, loadUser } = useOutletContext();
+  const { user, loadUser, usageStats } = useOutletContext();
   const [project, setProject] = useState(null);
   const [stats, setStats] = useState(null);
   const [overviewStats, setOverviewStats] = useState({
@@ -46,6 +46,7 @@ export default function ProjectDetail() {
   // Settings State
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingSecurity, setEditingSecurity] = useState(false);
   const [allowedOrigins, setAllowedOrigins] = useState([]);
   const [projectName, setProjectName] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
@@ -59,6 +60,7 @@ export default function ProjectDetail() {
 
   // Delete Confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDisableModal, setShowDisableModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -70,6 +72,7 @@ export default function ProjectDetail() {
   const [activityData, setActivityData] = useState([]);
   const [pagesData, setPagesData] = useState([]);
   const [loadingModalData, setLoadingModalData] = useState(false);
+  const [snippetType, setSnippetType] = useState('vanilla'); // 'vanilla', 'react', 'vanilla-count'
 
   useEffect(() => {
     if (tab) {
@@ -126,7 +129,10 @@ export default function ProjectDetail() {
 
       setStats(statsData);
       if (detailedStats) {
-        setOverviewStats(detailedStats);
+        setOverviewStats({
+          ...detailedStats,
+          recentActivity: detailedStats.activityList || []
+        });
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -144,7 +150,10 @@ export default function ProjectDetail() {
         apiRequest(`/analytics/projects/${projectId}/traffic?range=${timeRange}&timezone=${encodeURIComponent(timezone)}`)
       ]);
       setStats(statsData);
-      setOverviewStats(detailedStats);
+      setOverviewStats({
+        ...detailedStats,
+        recentActivity: detailedStats.activityList || []
+      });
     } catch (err) {
       // Silent fail
     }
@@ -197,6 +206,7 @@ export default function ProjectDetail() {
       });
       setProject(updatedProject);
       setEditing(false);
+      setEditingSecurity(false);
       showToast('Changes saved successfully', 'success');
 
       if (body.name && body.name !== idOrName) {
@@ -210,8 +220,14 @@ export default function ProjectDetail() {
   };
 
   const handleToggleActive = async () => {
+    if (isActive && !showDisableModal) {
+      setShowDisableModal(true);
+      return;
+    }
+
     const newStatus = !isActive;
     setIsActive(newStatus); // Optimistic update
+    setShowDisableModal(false);
 
     try {
       await apiRequest(`/projects/${project.id}`, {
@@ -246,7 +262,8 @@ export default function ProjectDetail() {
 
   const trackingId = project.tracking_id;
   const trackingUrl = `${API_URL}/track/${trackingId}`;
-  const trackingSnippet = `<script>
+
+  const vanillaSnippet = `<script>
 (function() {
   const TRACKING_ID = "${trackingId}";
   const ENDPOINT = "${trackingUrl}";
@@ -268,6 +285,69 @@ export default function ProjectDetail() {
   track();
 })();
 </script>`;
+
+  const reactSnippet = `import React, { useEffect } from 'react';
+
+export default function Tracker() {
+  useEffect(() => {
+    const trackingId = "${trackingId}";
+    const apiUrl = "${trackingUrl}";
+
+    fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageUrl: window.location.href,
+        referrer: document.referrer,
+        title: document.title
+      }),
+    }).catch(err => console.error("Tracking error:", err));
+  }, []);
+
+  return null;
+}`;
+
+  const vanillaCountSnippet = `<div id="visitor-count">Loading...</div>
+<script>
+(function() {
+  const trackingId = "${trackingId}";
+  const apiUrl = "${trackingUrl}";
+  const display = document.getElementById('visitor-count');
+
+  // 1. Get count
+  fetch(apiUrl)
+    .then(res => res.json())
+    .then(data => {
+      if (data.count !== undefined) display.innerText = data.count + " Visits";
+    });
+
+  // 2. Track visit
+  fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pageUrl: window.location.href,
+      referrer: document.referrer,
+      title: document.title
+    }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.count !== undefined) display.innerText = data.count + " Visits";
+    });
+})();
+</script>`;
+
+  const getActiveSnippet = () => {
+    switch (snippetType) {
+      case 'react': return reactSnippet;
+      case 'vanilla-count': return vanillaCountSnippet;
+      default: return vanillaSnippet;
+    }
+  };
+
+  const activeSnippet = getActiveSnippet();
+  const snippetLanguage = snippetType === 'react' ? 'javascript' : 'html';
 
   return (
     <div className="space-y-6">
@@ -394,33 +474,55 @@ export default function ProjectDetail() {
                 </div>
               </div>
               <div className="space-y-0">
-                {overviewStats.recentActivity?.map((activity, i) => (
-                  <div key={i} className="flex gap-4 relative pb-6 last:pb-0">
-                    {/* Vertical line */}
-                    {i !== overviewStats.recentActivity.length - 1 && (
-                      <div className="absolute left-[5px] top-2 bottom-0 w-px bg-slate-800"></div>
-                    )}
-                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 z-10 flex-shrink-0 ${i === 0 ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`}></div>
-                    <div>
-                      <p className="text-sm text-white truncate" title={activity.title || 'Unknown Page'}>
-                        <span className="font-medium">{activity.title || 'Unknown Page'}</span>
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                        {activity.device || 'Unknown'} - {activity.ip || 'Unknown IP'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                          <Globe className="h-3 w-3" /> {activity.location}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                {overviewStats.recentActivity?.map((activity, i) => {
+                  const getDeviceIcon = (device) => {
+                    const type = (device || 'desktop').toLowerCase();
+                    if (type === 'mobile') return <Smartphone className="h-3 w-3" />;
+                    if (type === 'tablet') return <Tablet className="h-3 w-3" />;
+                    return <Monitor className="h-3 w-3" />;
+                  };
+
+                  return (
+                    <div key={i} className="flex gap-4 relative pb-6 last:pb-0 group">
+                      {/* Vertical line */}
+                      {i !== overviewStats.recentActivity.length - 1 && (
+                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>
+                      )}
+
+                      <div className={`w-6 h-6 rounded-full z-10 flex-shrink-0 flex items-center justify-center border border-slate-800 ${i === 0 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-slate-900 text-slate-500'
+                        }`}>
+                        {getDeviceIcon(activity.device)}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-white truncate font-medium" title={activity.title || 'Unknown Page'}>
+                            {activity.title || 'Unknown Page'}
+                          </p>
+                          <span className="text-[10px] text-slate-500 whitespace-nowrap flex-shrink-0">
+                            {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1.5 truncate" title={activity.path}>
+                            <Globe className="h-3 w-3 text-slate-500" />
+                            {activity.path}
+                          </span>
+                          <span className="w-1 h-1 rounded-full bg-slate-700 flex-shrink-0"></span>
+                          <span className="flex items-center gap-1.5 truncate">
+                            {activity.location}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!overviewStats.recentActivity || overviewStats.recentActivity.length === 0) && (
-                  <p className="text-center text-slate-500 text-sm py-4">No recent activity</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <Activity className="h-8 w-8 mb-3 opacity-20" />
+                    <p className="text-sm">No recent activity</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -571,83 +673,114 @@ export default function ProjectDetail() {
       )}
 
       {activeTab === 'integration' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Snippet & URL */}
-          <div className="space-y-6">
-            {/* Tracking Snippet */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Code className="h-5 w-5 text-blue-400" />
-                  <h2 className="text-lg font-semibold text-white">Tracking Snippet</h2>
-                </div>
-                <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">JAVASCRIPT SDK</span>
+        <div className="space-y-6 max-w-4xl mx-auto">
+          {/* Tracking Snippet */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Code className="h-5 w-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Tracking Snippet</h2>
               </div>
-              <p className="text-sm text-slate-400 mb-4">Include this script in your website's <code>&lt;head&gt;</code> or <code>&lt;body&gt;</code> tag.</p>
-              <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mb-4 relative group">
-                <SyntaxHighlighter
-                  language="html"
-                  style={atomDark}
-                  customStyle={{
-                    background: 'transparent',
-                    padding: '1.5rem',
-                    margin: 0,
-                    fontSize: '0.875rem',
-                    lineHeight: '1.6',
-                  }}
-                  wrapLongLines={true}
+              <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+                <button
+                  onClick={() => setSnippetType('vanilla')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${snippetType === 'vanilla' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
-                  {trackingSnippet}
-                </SyntaxHighlighter>
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <CopyButton text={trackingSnippet} label="Copy Snippet" />
-                </div>
+                  Vanilla
+                </button>
+                <button
+                  onClick={() => setSnippetType('react')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${snippetType === 'react' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  React
+                </button>
+                <button
+                  onClick={() => setSnippetType('vanilla-count')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${snippetType === 'vanilla-count' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  With Counter
+                </button>
               </div>
             </div>
-
-            {/* Tracking URL */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <ExternalLink className="h-5 w-5 text-blue-400" />
-                <h2 className="text-lg font-semibold text-white">Tracking URL</h2>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={trackingUrl}
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-slate-300 font-mono text-sm focus:outline-none"
-                />
-                <CopyButton text={trackingUrl} label="Copy" />
+            <p className="text-sm text-slate-400 mb-4">
+              {snippetType === 'vanilla' && "Include this script in your website's <head> or <body> tag."}
+              {snippetType === 'react' && "Use this component in your React application."}
+              {snippetType === 'vanilla-count' && "Display the visitor count and track visits in vanilla JS."}
+            </p>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden mb-4 relative group">
+              <SyntaxHighlighter
+                language={snippetLanguage}
+                style={atomDark}
+                customStyle={{
+                  background: 'transparent',
+                  padding: '1.5rem',
+                  margin: 0,
+                  fontSize: '0.875rem',
+                  lineHeight: '1.6',
+                }}
+                wrapLongLines={true}
+              >
+                {activeSnippet}
+              </SyntaxHighlighter>
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <CopyButton text={activeSnippet} label="Copy Snippet" />
               </div>
             </div>
           </div>
 
-          {/* Right Column: Security & Status */}
-          <div className="space-y-6">
-            {/* Security & Access */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-6">
+          {/* Tracking URL */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ExternalLink className="h-5 w-5 text-blue-400" />
+              <h2 className="text-lg font-semibold text-white">Tracking URL</h2>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={trackingUrl}
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-slate-300 font-mono text-sm focus:outline-none"
+              />
+              <CopyButton text={trackingUrl} label="Copy" />
+            </div>
+          </div>
+
+          {/* Security & Access */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-blue-400" />
                 <h2 className="text-lg font-semibold text-white">Security & Access</h2>
               </div>
+              {!editingSecurity && (
+                <button
+                  onClick={() => setEditingSecurity(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors border border-slate-700"
+                >
+                  <Settings className="h-4 w-4" />
+                  Edit
+                </button>
+              )}
+            </div>
 
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
-                <div className="space-y-3">
-                  {allowedOrigins.map((origin, index) => (
-                    <div key={index} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={origin}
-                        onChange={(e) => {
-                          const newOrigins = [...allowedOrigins];
-                          newOrigins[index] = e.target.value;
-                          setAllowedOrigins(newOrigins);
-                        }}
-                        className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                        placeholder="https://example.com"
-                      />
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Allowed Origins</label>
+              <div className="space-y-3">
+                {allowedOrigins.map((origin, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={origin}
+                      disabled={!editingSecurity}
+                      onChange={(e) => {
+                        const newOrigins = [...allowedOrigins];
+                        newOrigins[index] = e.target.value;
+                        setAllowedOrigins(newOrigins);
+                      }}
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      placeholder="https://example.com"
+                    />
+                    {editingSecurity && (
                       <button
                         onClick={() => {
                           const newOrigins = allowedOrigins.filter((_, i) => i !== index);
@@ -657,54 +790,83 @@ export default function ProjectDetail() {
                       >
                         <Trash2 className="h-5 w-5" />
                       </button>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                ))}
+                {editingSecurity && (
                   <button
                     onClick={() => setAllowedOrigins([...allowedOrigins, ''])}
-                    disabled={allowedOrigins.length >= (user?.limits?.allowedOriginsLimit || 1)}
+                    disabled={allowedOrigins.length >= (usageStats?.allowedOriginsLimit || 1)}
                     className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded hover:bg-blue-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-blue-400"
                   >
                     <Plus className="h-4 w-4" />
                     Add Allowed Origin
                   </button>
-                  {allowedOrigins.length >= (user?.limits?.allowedOriginsLimit || 1) && (
-                    <p className="text-xs text-yellow-400 mt-2">
-                      Your {user?.plan || 'free'} plan allows {user?.limits?.allowedOriginsLimit || 1} allowed origin(s). Upgrade to Pro for unlimited origins.
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-4 text-xs text-slate-500">
-                  <div className="mt-0.5"><AlertTriangle className="h-3 w-3" /></div>
-                  <p>Enter the domains that are authorized to send tracking data to this project. Only requests from these origins will be accepted.</p>
-                </div>
+                )}
+                {allowedOrigins.length >= (usageStats?.allowedOriginsLimit || 1) && (
+                  <p className="text-xs text-yellow-400 mt-2">
+                    Your {usageStats?.plan || 'free'} plan allows {usageStats?.allowedOriginsLimit || 1} allowed origin(s). Upgrade to Pro for unlimited origins.
+                  </p>
+                )}
               </div>
-
-              <button
-                onClick={handleSaveSettings}
-                disabled={saving}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save Security Settings
-              </button>
+              <div className="flex gap-2 mt-4 text-xs text-slate-500">
+                <div className="mt-0.5"><AlertTriangle className="h-3 w-3" /></div>
+                <p>Enter the domains that are authorized to send tracking data to this project. Only requests from these origins will be accepted.</p>
+              </div>
             </div>
 
-            {/* Integration Status */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle className="h-5 w-5 text-blue-400" />
-                <h2 className="text-lg font-semibold text-white">Integration Status</h2>
+            {editingSecurity && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={saving}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Save Security Settings
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingSecurity(false);
+                    setAllowedOrigins(project.allowed_origins ? project.allowed_origins.split(',').map(o => o.trim()) : []);
+                  }}
+                  disabled={saving}
+                  className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors border border-slate-700 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
-              <p className="text-sm text-slate-400 mb-4">
-                Your security settings are properly configured. Data is being received from authorized origins only.
-              </p>
-              <div className="flex items-center gap-2 text-xs font-bold tracking-wider">
-                <span className="text-slate-500">STATUS:</span>
+            )}
+          </div>
+
+          {/* Integration Status */}
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              {allowedOrigins.some(o => o.trim() !== '') ? (
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              )}
+              <h2 className="text-lg font-semibold text-white">Integration Status</h2>
+            </div>
+            <p className="text-sm text-slate-400 mb-4">
+              {allowedOrigins.some(o => o.trim() !== '')
+                ? "Your security settings are properly configured. Data is being received from authorized origins only."
+                : "No allowed origins configured. Your project is open to requests from any domain, which may lead to usage abuse."}
+            </p>
+            <div className="flex items-center gap-2 text-xs font-bold tracking-wider">
+              <span className="text-slate-500">STATUS:</span>
+              {allowedOrigins.some(o => o.trim() !== '') ? (
                 <span className="text-green-400 flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                   SECURE
                 </span>
-              </div>
+              ) : (
+                <span className="text-yellow-400 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
+                  NOT SECURE
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -714,8 +876,21 @@ export default function ProjectDetail() {
         <div className="space-y-6">
           {/* Project Information */}
           <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
-            <p className="text-sm text-slate-400 mb-6">Update your project basics.</p>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-white mb-1">Project Information</h2>
+                <p className="text-sm text-slate-400">Update your project basics.</p>
+              </div>
+              {!editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors border border-slate-700"
+                >
+                  <Settings className="h-4 w-4" />
+                  Edit
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 gap-6 mb-6">
               <div>
@@ -723,8 +898,9 @@ export default function ProjectDetail() {
                 <input
                   type="text"
                   value={projectName}
+                  disabled={!editing}
                   onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-slate-500 mt-1">Only letters, numbers, hyphens, and underscores allowed.</p>
               </div>
@@ -734,8 +910,9 @@ export default function ProjectDetail() {
               <label className="block text-sm font-medium text-slate-300 mb-2">Time Zone</label>
               <select
                 value={timezone}
+                disabled={!editing}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="Asia/Kolkata">(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi</option>
                 <option value="UTC">(GMT+00:00) UTC</option>
@@ -744,14 +921,30 @@ export default function ProjectDetail() {
               </select>
             </div>
 
-            <button
-              onClick={handleSaveSettings}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save Changes
-            </button>
+            {editing && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Save Changes
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    setProjectName(project.name);
+                    setTargetUrl(project.target_url || '');
+                    setTimezone(project.timezone || '(GMT+05:30) Chennai, Kolkata, Mumbai, New Delhi');
+                  }}
+                  disabled={saving}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors border border-slate-700 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notification Preferences */}
@@ -880,6 +1073,38 @@ export default function ProjectDetail() {
       </Modal>
 
       <Modal
+        isOpen={showDisableModal}
+        onClose={() => setShowDisableModal(false)}
+        title="Disable Project"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+            <p className="text-sm text-yellow-200">
+              Disabling <strong>{project.name}</strong> will stop all new visitor tracking. Historical data will remain accessible.
+            </p>
+          </div>
+          <p className="text-sm text-slate-400">
+            Are you sure you want to disable this project? You can re-enable it at any time.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setShowDisableModal(false)}
+              className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleToggleActive}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-500 transition-colors"
+            >
+              Disable Project
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={showActivityModal}
         onClose={() => setShowActivityModal(false)}
         title="Recent Activity Log"
@@ -962,7 +1187,23 @@ export default function ProjectDetail() {
             />
             <CopyButton text={`${window.location.origin}/share/${shareToken}`} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            {shareToken && (
+              <button
+                onClick={async () => {
+                  try {
+                    await apiRequest(`/projects/${project.id}/share-token`, { method: 'DELETE' });
+                    setShareToken(null);
+                    showToast('Sharing disabled', 'success');
+                  } catch (err) {
+                    showToast('Failed to disable sharing', 'error');
+                  }
+                }}
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+              >
+                <X className="h-3 w-3" /> Disable Sharing
+              </button>
+            )}
             <button
               onClick={async () => {
                 try {
@@ -975,11 +1216,11 @@ export default function ProjectDetail() {
               }}
               className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
-              <RefreshCw className="h-3 w-3" /> Regenerate Link
+              <RefreshCw className="h-3 w-3" /> {shareToken ? 'Regenerate Link' : 'Generate Link'}
             </button>
           </div>
         </div>
       </Modal>
-    </div>
+    </div >
   );
 }

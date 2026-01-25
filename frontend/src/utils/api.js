@@ -4,7 +4,7 @@ export const getApiUrl = () => {
     return envUrl.endsWith('/v1') ? envUrl : `${envUrl.replace(/\/$/, '')}/v1`;
   }
   // return import.meta.env.PROD ? 'https://api-obs-iota.vercel.app/api/v1' : 'https://api-9ne7dgt9v-sris-projects-8ff08b1b.vercel.app/api/v1';
-  return import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1';
+  return '/api/v1';
 };
 
 const API_URL = getApiUrl();
@@ -27,8 +27,10 @@ export async function apiRequest(endpoint, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+    const error = new Error(errorData.error || 'Request failed');
+    error.data = errorData;
+    throw error;
   }
 
   if (response.status === 204) {

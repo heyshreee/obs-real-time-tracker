@@ -16,5 +16,7 @@ router.get('/:id/detailed-stats', visitorController.getProjectDetailedStats);
 router.get('/:id/activity', projectController.getProjectActivity);
 router.get('/:id/pages', projectController.getProjectPages);
 router.put('/:id/pin', projectController.togglePin);
+router.post('/:id/share-token', projectController.regenerateShareToken);
+router.delete('/:id/share-token', projectController.revokeShareToken);
 
 module.exports = router;

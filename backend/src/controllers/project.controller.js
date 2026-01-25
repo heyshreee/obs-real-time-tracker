@@ -3,6 +3,7 @@ const { v4: uuidv4, validate: uuidValidate } = require('uuid');
 const usageService = require('../services/usage.service');
 const NotificationService = require('../services/notification.service');
 const ActivityLogService = require('../services/activity.service');
+const EmailService = require('../services/email.service');
 
 exports.createProject = async (req, res) => {
     try {
@@ -94,6 +95,28 @@ exports.createProject = async (req, res) => {
                 `You have reached the maximum number of projects (${usage.projectLimit}) for your plan. Upgrade to create more.`,
                 'warning'
             );
+        }
+
+        // Activity Log
+        await ActivityLogService.log(
+            project.id,
+            userId,
+            'project.create',
+            `Project "${project.name}" created`,
+            'success',
+            req.ip,
+            {
+                resource: '/projects',
+                http_method: 'POST',
+                http_status: 201,
+                user_agent: req.headers['user-agent']
+            }
+        );
+
+        // Emit usage update
+        if (global.io) {
+            const updatedUsage = await usageService.calculateUsage(userId);
+            global.io.to(`user_${userId}`).emit('usage_update', updatedUsage);
         }
 
         res.status(201).json(project);
@@ -203,6 +226,28 @@ exports.deleteProject = async (req, res) => {
             'system'
         );
 
+        // Activity Log
+        await ActivityLogService.log(
+            projectId,
+            userId,
+            'project.delete',
+            `Project deleted`,
+            'success',
+            req.ip,
+            {
+                resource: `/projects/${id}`,
+                http_method: 'DELETE',
+                http_status: 200,
+                user_agent: req.headers['user-agent']
+            }
+        );
+
+        // Emit usage update
+        if (global.io) {
+            const updatedUsage = await usageService.calculateUsage(userId);
+            global.io.to(`user_${userId}`).emit('usage_update', updatedUsage);
+        }
+
         res.json({ success: true });
     } catch (error) {
         console.error('Delete project error:', error);
@@ -272,17 +317,31 @@ exports.updateProject = async (req, res) => {
             await ActivityLogService.log(
                 projectId,
                 userId,
-                'Project Disabled',
-                `Manual suspension by project owner. Reason: User action`,
-                isActive ? 'success' : 'warning'
+                'project.status',
+                `Project ${isActive ? 'enabled' : 'disabled'}`,
+                isActive ? 'success' : 'warning',
+                req.ip,
+                {
+                    resource: `/projects/${id}`,
+                    http_method: 'PATCH',
+                    http_status: 200,
+                    user_agent: req.headers['user-agent']
+                }
             );
         } else if (Object.keys(updates).length > 0) {
             await ActivityLogService.log(
                 projectId,
                 userId,
-                'Settings Updated',
+                'project.update',
                 'Project settings were updated',
-                'success'
+                'success',
+                req.ip,
+                {
+                    resource: `/projects/${id}`,
+                    http_method: 'PATCH',
+                    http_status: 200,
+                    user_agent: req.headers['user-agent']
+                }
             );
         }
 
@@ -481,6 +540,25 @@ exports.regenerateShareToken = async (req, res) => {
             projectId = project.id;
         }
 
+        // Check if project already has a token
+        const { data: existingProject } = await supabase
+            .from('projects')
+            .select('share_token')
+            .eq('id', projectId)
+            .single();
+
+        // If no token exists, check limits before creating one
+        if (!existingProject?.share_token) {
+            const limitCheck = await usageService.checkLimit(userId, 'share_report');
+            if (!limitCheck.canTrack) {
+                return res.status(403).json({
+                    error: 'LIMIT_EXCEEDED',
+                    message: limitCheck.reason,
+                    usage: limitCheck.usage
+                });
+            }
+        }
+
         const { data: updatedProject, error } = await supabase
             .from('projects')
             .update({ share_token: uuidv4() })
@@ -499,10 +577,65 @@ exports.regenerateShareToken = async (req, res) => {
             'activity'
         );
 
+        // Send Report Ready Email
+        const reportName = `${updatedProject.name} - Public Report`;
+        const period = 'Last 30 Days'; // Default period
+        const date = new Date().toLocaleString();
+
+        // Get user email to send report
+        const { data: user } = await supabase.from('users').select('email, name').eq('id', userId).single();
+        if (user) {
+            EmailService.sendReportReadyEmail(user.email, reportName, period, date, user.name || 'User').catch(console.error);
+        }
+
+        // Emit usage update
+        if (global.io) {
+            const updatedUsage = await usageService.calculateUsage(userId);
+            global.io.to(`user_${userId}`).emit('usage_update', updatedUsage);
+        }
+
         res.json({ share_token: updatedProject.share_token });
     } catch (error) {
         console.error('Regenerate token error:', error);
         res.status(500).json({ error: 'Failed to regenerate token' });
+    }
+};
+
+exports.revokeShareToken = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const { data: project } = await supabase
+            .from('projects')
+            .select('id, share_token')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const { data: updatedProject, error } = await supabase
+            .from('projects')
+            .update({ share_token: null })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Emit usage update
+        if (global.io) {
+            const updatedUsage = await usageService.calculateUsage(userId);
+            global.io.to(`user_${userId}`).emit('usage_update', updatedUsage);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Revoke token error:', error);
+        res.status(500).json({ error: 'Failed to revoke token' });
     }
 };
 

@@ -64,8 +64,6 @@ exports.trackVisitor = async (req, res) => {
         }
 
         // 3. Tracking Abuse Prevention (Hashing + Rolling TTL)
-        // We use a combination of IP, UA, and Project to identify a unique "hit"
-        // and drop duplicates within a short window (e.g., 30 seconds)
         const hitHash = generateHitHash(ip, userAgent, trackingCode);
         const now = Date.now();
 
@@ -77,7 +75,7 @@ exports.trackVisitor = async (req, res) => {
         }
         requestCache.set(hitHash, now);
 
-        // Cleanup cache periodically (simple version)
+        // Cleanup cache periodically
         if (requestCache.size > 10000) {
             for (const [key, timestamp] of requestCache.entries()) {
                 if (now - timestamp > 60000) requestCache.delete(key);
@@ -87,12 +85,29 @@ exports.trackVisitor = async (req, res) => {
         // 4. Get project by tracking ID
         const { data: project } = await supabase
             .from('projects')
-            .select('id, user_id')
+            .select('id, user_id, plan, is_active')
             .eq('tracking_id', trackingCode)
             .single();
 
-        if (!project) {
-            return res.status(404).json({ error: 'INVALID_TRACKING_CODE', message: 'Invalid tracking code' });
+        if (project.is_active === false) {
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.blocked',
+                    `Tracking attempt blocked: Project is disabled`,
+                    'failure',
+                    ip,
+                    {
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 403,
+                        user_agent: userAgent,
+                        event_type: 'visitor.blocked'
+                    }
+                );
+            }
+            return res.status(403).json({ error: 'Project is disabled' });
         }
 
         // Check limits before proceeding
@@ -120,7 +135,7 @@ exports.trackVisitor = async (req, res) => {
             city = 'Local Machine';
         }
 
-        // 5. Update Counters (All-time views)
+        // 5. Update Counters
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
             p_id: project.id
         });
@@ -135,12 +150,16 @@ exports.trackVisitor = async (req, res) => {
             if (counter) {
                 await supabase
                     .from('counters')
-                    .update({ count: counter.count + 1, updated_at: new Date() })
+                    .update({ count: (counter.count || 0) + 1, updated_at: new Date() })
                     .eq('project_id', project.id);
+            } else {
+                await supabase
+                    .from('counters')
+                    .insert({ project_id: project.id, count: 1 });
             }
         }
 
-        // 6. Update Usages (Monthly views)
+        // 6. Update Usages
         const currentMonth = new Date().toISOString().slice(0, 7);
         const { data: usage } = await supabase
             .from('usages')
@@ -158,18 +177,14 @@ exports.trackVisitor = async (req, res) => {
         } else {
             await supabase
                 .from('usages')
-                .insert({
-                    project_id: project.id,
-                    month: currentMonth,
-                    views: 1
-                });
+                .insert({ project_id: project.id, month: currentMonth, views: 1 });
         }
 
         // 7. Keep detailed visitor log
         const visitorData = {
             user_id: project.user_id,
             project_id: project.id,
-            session_id: sessionId || hitHash.substring(0, 20), // Fallback to hash if no session
+            session_id: sessionId || hitHash.substring(0, 20),
             ip_address: ip,
             user_agent: userAgent,
             country: country,
@@ -202,6 +217,30 @@ exports.trackVisitor = async (req, res) => {
                 global.io.to(`user_${project.user_id}`).emit('visitor_update', { ...visitor, project_id: project.id });
                 const updatedUsage = await usageService.calculateUsage(project.user_id);
                 global.io.to(`user_${project.user_id}`).emit('usage_update', updatedUsage);
+            }
+
+            // Log Activity for New Visitor (Internal)
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.new',
+                    `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
+                    'success',
+                    ip,
+                    {
+                        session_id: sessionId || hitHash.substring(0, 20),
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 200,
+                        latency_ms: Date.now() - req._startTime || 0,
+                        country,
+                        city,
+                        user_agent: userAgent,
+                        event_type: 'visitor.new',
+                        plan: project.plan || 'free'
+                    }
+                );
             }
         }
 
@@ -461,26 +500,84 @@ exports.trackVisitorPublic = async (req, res) => {
         }
 
         if (project.is_active === false) {
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.blocked',
+                    `Tracking attempt blocked: Project is disabled`,
+                    'failure',
+                    ip,
+                    {
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 403,
+                        user_agent: userAgent,
+                        event_type: 'visitor.blocked'
+                    }
+                );
+            }
             return res.status(403).json({ error: 'Project is disabled' });
         }
 
         // Check Allowed Origins
         const origin = req.headers['origin'] || req.headers['referer'];
         if (project.allowed_origins && project.allowed_origins.length > 0 && origin) {
-            const originHostname = new URL(origin).hostname;
-            const isAllowed = project.allowed_origins.some(allowed =>
-                originHostname === allowed || originHostname.endsWith('.' + allowed)
-            );
-
-            if (!isAllowed) {
-                // Notify user about blocked origin
-                await NotificationService.create(
-                    project.user_id,
-                    'Security Alert: Origin Blocked',
-                    `Blocked request from unauthorized origin: ${originHostname} for project "${project.name || 'Unknown'}"`,
-                    'security'
+            try {
+                let originHostname;
+                if (origin === 'null') {
+                    originHostname = 'null';
+                } else {
+                    originHostname = new URL(origin).hostname;
+                }
+                const allowedOriginsArray = project.allowed_origins.split(',').map(o => {
+                    try {
+                        // If it's a full URL, extract the hostname
+                        if (o.trim().startsWith('http')) {
+                            return new URL(o.trim()).hostname;
+                        }
+                        return o.trim();
+                    } catch (e) {
+                        return o.trim();
+                    }
+                });
+                const isAllowed = allowedOriginsArray.some(allowed =>
+                    originHostname === allowed || originHostname.endsWith('.' + allowed)
                 );
-                return res.status(403).json({ error: 'ORIGIN_NOT_ALLOWED' });
+
+                if (!isAllowed) {
+                    // Notify user about blocked origin
+                    await NotificationService.create(
+                        project.user_id,
+                        'Security Alert: Origin Blocked',
+                        `Blocked request from unauthorized origin: ${originHostname} for project "${project.name || 'Unknown'}"`,
+                        'security'
+                    );
+
+                    // Log security alert as failure
+                    if (project.user_id) {
+                        await ActivityLogService.log(
+                            project.id,
+                            project.user_id,
+                            'security.alert',
+                            `Blocked request from unauthorized origin: ${originHostname}`,
+                            'failure',
+                            ip,
+                            {
+                                resource: pageUrl,
+                                http_method: req.method,
+                                http_status: 403,
+                                user_agent: userAgent,
+                                event_type: 'security.alert'
+                            }
+                        );
+                    }
+
+                    return res.status(403).json({ error: 'ORIGIN_NOT_ALLOWED' });
+                }
+            } catch (urlError) {
+                console.error('Origin validation error:', urlError);
+                return res.status(403).json({ error: 'INVALID_ORIGIN' });
             }
         }
 
@@ -496,11 +593,9 @@ exports.trackVisitorPublic = async (req, res) => {
 
         if (requestCache.has(hitHash)) {
             const lastHit = requestCache.get(hitHash);
-            if (now - lastHit < 30000) { // 30 seconds TTL
+            if (now - lastHit < 5000) { // 5 seconds TTL
                 return res.json({ success: true, ignored: 'DUPLICATE_HIT' });
             }
-            // If it's been more than 30s, we might still want to check limits again or just proceed
-            // For now, we proceed but update the cache time
         }
         requestCache.set(hitHash, now);
 
@@ -519,6 +614,7 @@ exports.trackVisitorPublic = async (req, res) => {
             city = 'Local Machine';
         }
 
+        // 5. Update Counters
         const { error: counterError } = await supabase.rpc('increment_project_counter', {
             p_id: project.id
         });
@@ -533,8 +629,12 @@ exports.trackVisitorPublic = async (req, res) => {
             if (counter) {
                 await supabase
                     .from('counters')
-                    .update({ count: counter.count + 1, updated_at: new Date() })
+                    .update({ count: (counter.count || 0) + 1, updated_at: new Date() })
                     .eq('project_id', project.id);
+            } else {
+                await supabase
+                    .from('counters')
+                    .insert({ project_id: project.id, count: 1 });
             }
         }
 
@@ -558,8 +658,6 @@ exports.trackVisitorPublic = async (req, res) => {
                 .insert({ project_id: project.id, month: currentMonth, views: 1 });
         }
 
-        // Use the hash as the session ID for visitor tracking
-        // This ensures privacy (no PII sent from client) and consistency
         const sessionId = hitHash.substring(0, 20);
 
         const visitorData = {
@@ -601,28 +699,52 @@ exports.trackVisitorPublic = async (req, res) => {
             }
 
             // Log Activity for New Visitor
-            await ActivityLogService.log(
-                project.id,
-                null, // No user ID for public visitor
-                'New Visitor',
-                `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
-                'success',
-                ip
-            );
+            if (project.user_id) {
+                await ActivityLogService.log(
+                    project.id,
+                    project.user_id,
+                    'visitor.new',
+                    `Page: ${title || pageUrl}, IP: ${ip}, Country: ${country}`,
+                    'success',
+                    ip,
+                    {
+                        session_id: sessionId,
+                        resource: pageUrl,
+                        http_method: req.method,
+                        http_status: 200,
+                        latency_ms: Date.now() - req._startTime || 0,
+                        country,
+                        city,
+                        user_agent: userAgent,
+                        event_type: 'visitor.new',
+                        plan: 'free'
+                    }
+                );
+            }
 
-            // We don't need to return the count for sendBeacon requests, but we'll keep it for now
-            // in case someone uses fetch and wants it.
-            // Ideally, sendBeacon ignores the response.
-            res.json({ success: true });
+            // Fetch the updated count to return to the frontend
+            const { data: counter } = await supabase
+                .from('counters')
+                .select('count')
+                .eq('project_id', project.id)
+                .single();
+
+            res.json({
+                success: true,
+                count: counter?.count || 0
+            });
         } else {
-            // Even if visitor upsert fails (rare), we return success to the client
-            // to avoid errors in their console.
             console.error('Visitor upsert error:', visitorError);
-            res.json({ success: true });
+            // Still return the count even if visitor log failed
+            const { data: counter } = await supabase
+                .from('counters')
+                .select('count')
+                .eq('project_id', project.id)
+                .single();
+            res.json({ success: true, count: counter?.count || 0 });
         }
     } catch (error) {
         console.error('Public track error:', error);
-        // Always return 200/JSON to avoid CORS/Beacon errors on client
         res.status(200).json({ success: false, error: 'Internal Error' });
     }
 };
@@ -640,7 +762,12 @@ exports.getVisitorCountPublic = async (req, res) => {
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        res.json({ count: project.counters?.count || 0 });
+        // Supabase returns joined tables as arrays by default
+        const count = Array.isArray(project.counters)
+            ? project.counters[0]?.count
+            : project.counters?.count;
+
+        res.json({ count: count || 0 });
     } catch (error) {
         console.error('Get public count error:', error);
         res.status(500).json({ error: 'Failed to fetch count' });
@@ -821,16 +948,15 @@ exports.getProjectDetailedStats = async (req, res) => {
         res.json({
             realTimeVisitors: realTimeVisitors || 0,
             trafficData,
-            recentActivity: activityList,
+            activityList,
             topReferrers,
             uniqueVisitors: uniqueVisitors || 0,
             deviceStats,
-            topPages,
-            avgSessionDuration: "2m 45s"
+            topPages
         });
 
     } catch (error) {
-        console.error('Get project detailed stats error:', error);
+        console.error('Project detailed stats error:', error);
         res.status(500).json({ error: 'Failed to fetch project stats' });
     }
 };

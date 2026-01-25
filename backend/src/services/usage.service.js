@@ -8,23 +8,29 @@ const PLAN_LIMITS = {
         projectLimit: 5,
         liveLogs: false,
         emailIntegrity: false,
-        allowedOriginsLimit: 1
+        allowedOriginsLimit: 1,
+        share_report: 5,
+        amount: 0
     },
     pro: {
         monthlyViews: 100000,
         storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 100,
+        projectLimit: 10,
         liveLogs: true,
         emailIntegrity: true,
-        allowedOriginsLimit: 10
+        allowedOriginsLimit: 10,
+        share_report: 100,
+        amount: 29
     },
     enterprise: {
         monthlyViews: 1000000000, // Effectively unlimited
         storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
-        projectLimit: 1000,
+        projectLimit: 100,
         liveLogs: true,
         emailIntegrity: true,
-        allowedOriginsLimit: 999
+        allowedOriginsLimit: 999,
+        share_report: Infinity,
+        amount: 'custom'
     }
 };
 
@@ -92,7 +98,20 @@ exports.calculateUsage = async (userId) => {
         .eq('id', userId)
         .then(({ error }) => {
             if (error) console.error('Failed to update storage stats in supabase:', error);
+        })
+        .catch(err => {
+            // Suppress timeout errors in background tasks
+            if (err.code !== 'UND_ERR_CONNECT_TIMEOUT') {
+                console.error('Failed to update storage stats in supabase:', err);
+            }
         });
+    // 4. Calculate Share Reports (Projects with share_token)
+    const { count: shareReportCount } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .not('share_token', 'is', null);
+
     return {
         totalViews,
         monthlyLimit: limits.monthlyViews,
@@ -104,7 +123,15 @@ exports.calculateUsage = async (userId) => {
             pageViews: viewStorage
         },
         plan,
-        projectLimit: limits.projectLimit
+        projectLimit: limits.projectLimit,
+        liveLogs: limits.liveLogs,
+        emailIntegrity: limits.emailIntegrity,
+        allowedOriginsLimit: limits.allowedOriginsLimit,
+        share_report: {
+            used: shareReportCount || 0,
+            limit: limits.share_report
+        },
+        projectCount: projects?.length || 0
     };
 };
 
@@ -177,7 +204,12 @@ exports.checkLimit = async (userId, type = 'track') => {
                     userId,
                     'Plan Limit Reached',
                     `Project creation blocked: ${usage.plan} plan limit of ${usage.projectLimit} projects reached`,
-                    'warning'
+                    'warning',
+                    null,
+                    {
+                        event_type: 'system.limit',
+                        plan: usage.plan
+                    }
                 );
             }
         }
@@ -185,6 +217,25 @@ exports.checkLimit = async (userId, type = 'track') => {
         return {
             canTrack: projectsOk,
             reason: !projectsOk ? 'Project limit reached. Upgrade to Pro.' : null,
+            usage
+        };
+    }
+
+    if (type === 'share_report') {
+        const shareReportOk = (usage.share_report.used || 0) < usage.share_report.limit;
+
+        if (!shareReportOk) {
+            await NotificationService.create(
+                userId,
+                'Plan Limit Reached',
+                `You have reached the maximum number of shared reports for your plan. Upgrade to share more.`,
+                'warning'
+            );
+        }
+
+        return {
+            canTrack: shareReportOk,
+            reason: !shareReportOk ? 'Shared report limit reached. Upgrade to Pro.' : null,
             usage
         };
     }
