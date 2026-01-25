@@ -100,7 +100,7 @@ function App() {
                                         }
                                     />
                                     <Route
-                                        path="/dashboard/settings"
+                                        path="/dashboard/settings/:tab?"
                                         element={
                                             <PrivateRoute>
                                                 <Settings />

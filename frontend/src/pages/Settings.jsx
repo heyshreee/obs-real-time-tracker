@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     User, Shield, Bell, BarChart2, Briefcase,
@@ -12,7 +12,9 @@ import Spinner from '../components/Spinner';
 
 export default function Settings() {
     const { user, loadUser } = useOutletContext();
-    const [activeTab, setActiveTab] = useState('profile');
+    const { tab } = useParams();
+    const navigate = useNavigate();
+    const activeTab = tab || 'profile';
     const { showToast } = useToast();
 
     const tabs = [
@@ -25,23 +27,23 @@ export default function Settings() {
 
     return (
         <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex flex-col md:flex-row gap-8 items-start">
                 {/* Sidebar */}
                 <div className="w-full md:w-64 flex-shrink-0">
                     <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-4 sticky top-24">
                         <h2 className="text-lg font-bold text-white mb-4 px-4">Settings</h2>
                         <nav className="space-y-1">
-                            {tabs.map((tab) => (
+                            {tabs.map((t) => (
                                 <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
+                                    key={t.id}
+                                    onClick={() => navigate(`/dashboard/settings/${t.id}`)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t.id
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                                         : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                                         }`}
                                 >
-                                    <tab.icon className="h-4 w-4" />
-                                    {tab.label}
+                                    <t.icon className="h-4 w-4" />
+                                    {t.label}
                                 </button>
                             ))}
                         </nav>
@@ -73,6 +75,7 @@ export default function Settings() {
 
 function ProfileSection({ user, loadUser, showToast }) {
     const [loading, setLoading] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
         bio: user?.bio || '',
@@ -91,6 +94,7 @@ function ProfileSection({ user, loadUser, showToast }) {
             });
             await loadUser();
             showToast('Profile updated successfully', 'success');
+            setIsEditing(false);
         } catch (error) {
             showToast('Failed to update profile', 'error');
         } finally {
@@ -106,9 +110,21 @@ function ProfileSection({ user, loadUser, showToast }) {
                         <h3 className="text-xl font-bold text-white">Profile Information</h3>
                         <p className="text-sm text-slate-500 mt-1">Update your profile basics.</p>
                     </div>
-                    <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg border border-slate-700 transition-colors flex items-center gap-2">
-                        <SettingsIcon className="h-4 w-4" />
-                        Edit
+                    <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${isEditing
+                            ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white border-transparent'
+                            }`}
+                    >
+                        {isEditing ? (
+                            <>Cancel</>
+                        ) : (
+                            <>
+                                <Edit2 className="h-4 w-4" />
+                                Edit
+                            </>
+                        )}
                     </button>
                 </div>
 
@@ -124,11 +140,17 @@ function ProfileSection({ user, loadUser, showToast }) {
                         <h4 className="text-lg font-bold text-white mb-1">Profile Picture</h4>
                         <p className="text-sm text-slate-400 mb-4">JPG, GIF or PNG. Max size 800K</p>
                         <div className="flex gap-3">
-                            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                            <button
+                                disabled={!isEditing}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 <Upload className="h-4 w-4" />
                                 Upload New
                             </button>
-                            <button className="px-4 py-2 bg-slate-800/50 hover:bg-red-500/10 text-slate-400 hover:text-red-500 text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                            <button
+                                disabled={!isEditing}
+                                className="px-4 py-2 bg-slate-800/50 hover:bg-red-500/10 text-slate-400 hover:text-red-500 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 <Trash2 className="h-4 w-4" />
                                 Remove
                             </button>
@@ -143,11 +165,12 @@ function ProfileSection({ user, loadUser, showToast }) {
                             <div className="relative">
                                 <input
                                     type="text"
+                                    disabled={!isEditing}
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pr-10"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
-                                <Edit2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 pointer-events-none" />
+                                {isEditing && <Edit2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 pointer-events-none" />}
                             </div>
                         </div>
                         <div>
@@ -155,12 +178,13 @@ function ProfileSection({ user, loadUser, showToast }) {
                             <div className="relative">
                                 <input
                                     type="text"
+                                    disabled={!isEditing}
                                     value={formData.job_title}
                                     onChange={e => setFormData({ ...formData, job_title: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pr-10"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="e.g. Senior Developer"
                                 />
-                                <Edit2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 pointer-events-none" />
+                                {isEditing && <Edit2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 pointer-events-none" />}
                             </div>
                         </div>
                     </div>
@@ -170,12 +194,13 @@ function ProfileSection({ user, loadUser, showToast }) {
                         <div className="relative">
                             <textarea
                                 value={formData.bio}
+                                disabled={!isEditing}
                                 onChange={e => setFormData({ ...formData, bio: e.target.value })}
                                 rows={4}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none pr-10"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 placeholder="Tell us a little about yourself..."
                             />
-                            <Edit2 className="absolute right-3 top-4 h-4 w-4 text-slate-600 pointer-events-none" />
+                            {isEditing && <Edit2 className="absolute right-3 top-4 h-4 w-4 text-slate-600 pointer-events-none" />}
                         </div>
                     </div>
 
@@ -184,8 +209,9 @@ function ProfileSection({ user, loadUser, showToast }) {
                             <label className="block text-sm font-medium text-slate-400 mb-2">Language</label>
                             <select
                                 value={formData.language}
+                                disabled={!isEditing}
                                 onChange={e => setFormData({ ...formData, language: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="en-US">English (US)</option>
                                 <option value="es">Spanish</option>
@@ -197,8 +223,9 @@ function ProfileSection({ user, loadUser, showToast }) {
                             <label className="block text-sm font-medium text-slate-400 mb-2">Timezone</label>
                             <select
                                 value={formData.timezone}
+                                disabled={!isEditing}
                                 onChange={e => setFormData({ ...formData, timezone: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="UTC">UTC</option>
                                 <option value="EST">Eastern Standard Time (EST)</option>
@@ -208,16 +235,18 @@ function ProfileSection({ user, loadUser, showToast }) {
                         </div>
                     </div>
 
-                    <div className="flex justify-end pt-4 border-t border-slate-800/50">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            Save Changes
-                        </button>
-                    </div>
+                    {isEditing && (
+                        <div className="flex justify-end pt-4 border-t border-slate-800/50">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                Save Changes
+                            </button>
+                        </div>
+                    )}
                 </form>
             </div>
         </div>
@@ -226,6 +255,8 @@ function ProfileSection({ user, loadUser, showToast }) {
 
 function SecuritySection({ user, showToast }) {
     const [loading, setLoading] = useState(false);
+    const [loadingSessions, setLoadingSessions] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [sessions, setSessions] = useState([]);
 
@@ -239,6 +270,8 @@ function SecuritySection({ user, showToast }) {
             setSessions(data);
         } catch (err) {
             console.error(err);
+        } finally {
+            setLoadingSessions(false);
         }
     };
 
@@ -259,6 +292,7 @@ function SecuritySection({ user, showToast }) {
             });
             showToast('Password updated successfully', 'success');
             setPasswords({ current: '', new: '', confirm: '' });
+            setIsEditing(false);
         } catch (error) {
             showToast(error.message || 'Failed to update password', 'error');
         } finally {
@@ -266,18 +300,37 @@ function SecuritySection({ user, showToast }) {
         }
     };
 
+    if (loadingSessions) return <Spinner />;
+
     return (
         <div className="space-y-6">
             <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
-                <h3 className="text-xl font-bold text-white mb-6">Change Password</h3>
+                <div className="flex justify-between items-start mb-6">
+                    <h3 className="text-xl font-bold text-white">Change Password</h3>
+                    <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${isEditing
+                            ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white border-transparent'
+                            }`}
+                    >
+                        {isEditing ? 'Cancel' : (
+                            <>
+                                <Edit2 className="h-4 w-4" />
+                                Edit
+                            </>
+                        )}
+                    </button>
+                </div>
                 <form onSubmit={handlePasswordUpdate} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Current Password</label>
                         <input
                             type="password"
+                            disabled={!isEditing}
                             value={passwords.current}
                             onChange={e => setPasswords({ ...passwords, current: e.target.value })}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -285,31 +338,35 @@ function SecuritySection({ user, showToast }) {
                             <label className="block text-sm font-medium text-slate-400 mb-2">New Password</label>
                             <input
                                 type="password"
+                                disabled={!isEditing}
                                 value={passwords.new}
                                 onChange={e => setPasswords({ ...passwords, new: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Confirm New Password</label>
                             <input
                                 type="password"
+                                disabled={!isEditing}
                                 value={passwords.confirm}
                                 onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                     </div>
-                    <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            Update Password
-                        </button>
-                    </div>
+                    {isEditing && (
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                Update Password
+                            </button>
+                        </div>
+                    )}
                 </form>
             </div>
 
@@ -348,6 +405,7 @@ function SecuritySection({ user, showToast }) {
 }
 
 function NotificationsSection({ user, showToast }) {
+    const [isEditing, setIsEditing] = useState(false);
     const [preferences, setPreferences] = useState(user?.notification_preferences || {
         email: true,
         browser: true,
@@ -356,6 +414,7 @@ function NotificationsSection({ user, showToast }) {
     });
 
     const handleToggle = async (key) => {
+        if (!isEditing) return;
         const newPrefs = { ...preferences, [key]: !preferences[key] };
         setPreferences(newPrefs);
         try {
@@ -371,7 +430,23 @@ function NotificationsSection({ user, showToast }) {
 
     return (
         <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
-            <h3 className="text-xl font-bold text-white mb-6">Notification Preferences</h3>
+            <div className="flex justify-between items-start mb-6">
+                <h3 className="text-xl font-bold text-white">Notification Preferences</h3>
+                <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${isEditing
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white border-transparent'
+                        }`}
+                >
+                    {isEditing ? 'Done' : (
+                        <>
+                            <Edit2 className="h-4 w-4" />
+                            Edit
+                        </>
+                    )}
+                </button>
+            </div>
             <div className="space-y-6">
                 {[
                     { id: 'email', label: 'Email Notifications', desc: 'Receive daily summaries and critical alerts via email.' },
@@ -386,7 +461,8 @@ function NotificationsSection({ user, showToast }) {
                         </div>
                         <button
                             onClick={() => handleToggle(item.id)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences[item.id] ? 'bg-blue-600' : 'bg-slate-700'
+                            disabled={!isEditing}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${preferences[item.id] ? 'bg-blue-600' : 'bg-slate-700'
                                 }`}
                         >
                             <span
@@ -463,6 +539,7 @@ function UsageSection({ user }) {
 function ProjectsSection({ user }) {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
         apiRequest('/projects')
@@ -480,9 +557,19 @@ function ProjectsSection({ user }) {
                     <h3 className="text-xl font-bold text-white">Projects & Teams</h3>
                     <p className="text-sm text-slate-500 mt-1">Manage your projects and team members.</p>
                 </div>
-                <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg border border-slate-700 transition-colors flex items-center gap-2">
-                    <SettingsIcon className="h-4 w-4" />
-                    Edit
+                <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${isEditing
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white border-transparent'
+                        }`}
+                >
+                    {isEditing ? 'Done' : (
+                        <>
+                            <SettingsIcon className="h-4 w-4" />
+                            Edit
+                        </>
+                    )}
                 </button>
             </div>
 
@@ -507,7 +594,10 @@ function ProjectsSection({ user }) {
                                 <span className="px-2 py-1 bg-slate-800 text-slate-400 text-xs font-bold rounded uppercase tracking-wider">
                                     Owner
                                 </span>
-                                <button className="p-2 text-slate-400 hover:text-white transition-colors">
+                                <button
+                                    disabled={!isEditing}
+                                    className="p-2 text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
                                     <Edit2 className="h-4 w-4" />
                                 </button>
                             </div>
