@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     User, Shield, Bell, BarChart2, Briefcase,
     Save, Loader, Upload, Trash2, Monitor, Smartphone, Globe,
-    Check, AlertTriangle, LogOut, Settings as SettingsIcon, Edit2
+    Check, AlertTriangle, LogOut, Settings as SettingsIcon, Edit2, CreditCard, Download
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -23,6 +23,7 @@ export default function Settings() {
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'usage', label: 'Usage & Quota', icon: BarChart2 },
         { id: 'projects', label: 'Projects & Teams', icon: Briefcase },
+        { id: 'billing', label: 'Billing & Invoices', icon: BarChart2 },
     ];
 
     return (
@@ -65,6 +66,7 @@ export default function Settings() {
                             {activeTab === 'notifications' && <NotificationsSection user={user} showToast={showToast} />}
                             {activeTab === 'usage' && <UsageSection user={user} />}
                             {activeTab === 'projects' && <ProjectsSection user={user} />}
+                            {activeTab === 'billing' && <BillingSection />}
                         </motion.div>
                     </AnimatePresence>
                 </div>
@@ -760,6 +762,136 @@ function ProjectsSection({ user }) {
                         </div>
                     ))
                 )}
+            </div>
+        </div>
+    );
+}
+
+function BillingSection() {
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        loadPaymentHistory();
+    }, []);
+
+    const loadPaymentHistory = async () => {
+        try {
+            const history = await apiRequest('/payment/history');
+            setPaymentHistory(history);
+        } catch (err) {
+            console.error('Failed to load payment history:', err);
+            showToast('Failed to load payment history', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDownloadReceipt = async (paymentId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/payment/receipt/${paymentId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Download failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `receipt_${paymentId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            showToast('Failed to download receipt', 'error');
+        }
+    };
+
+    const handleEmailReceipt = async (paymentId) => {
+        try {
+            await apiRequest(`/payment/receipt/${paymentId}/email`, {
+                method: 'POST'
+            });
+            showToast('Receipt sent to your email', 'success');
+        } catch (error) {
+            console.error('Email receipt error:', error);
+            showToast('Failed to send receipt email', 'error');
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
+                <h3 className="text-xl font-bold text-white mb-8">Payment History</h3>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-800/50">
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Description</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/30">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-8 text-center text-slate-500">
+                                        <Loader className="h-6 w-6 animate-spin mx-auto mb-2" />
+                                        Loading history...
+                                    </td>
+                                </tr>
+                            ) : paymentHistory.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-8 text-center text-slate-500">
+                                        No payment history found
+                                    </td>
+                                </tr>
+                            ) : (
+                                paymentHistory.map((payment) => (
+                                    <tr key={payment.id} className="group hover:bg-slate-800/20 transition-colors">
+                                        <td className="px-6 py-6 text-sm text-slate-300 font-medium">
+                                            {new Date(payment.date).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-6 text-sm text-white font-bold">{payment.description || 'Subscription'}</td>
+                                        <td className="px-6 py-6 text-sm text-slate-300">${payment.amount}</td>
+                                        <td className="px-6 py-6">
+                                            <span className="px-2.5 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-md uppercase tracking-wider border border-green-500/20">
+                                                {payment.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-3">
+                                                <button
+                                                    onClick={() => handleDownloadReceipt(payment.id)}
+                                                    className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                                                    title="Download Receipt"
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEmailReceipt(payment.id)}
+                                                    className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                                                    title="Email Receipt"
+                                                >
+                                                    <Bell className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

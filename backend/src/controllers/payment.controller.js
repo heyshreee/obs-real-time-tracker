@@ -64,14 +64,37 @@ exports.verifyPayment = async (req, res) => {
 
         if (expectedSignature === razorpay_signature) {
             // Payment verified - Update user plan
-            const { error } = await supabase
+            const { error: updateError } = await supabase
                 .from('users')
                 .update({
                     plan: planId
                 })
                 .eq('id', userId);
 
-            if (error) throw error;
+            if (updateError) throw updateError;
+
+            // Store payment record
+            const planLimits = getPlanLimits(planId);
+            const amount = planLimits.amount;
+
+            const { error: paymentError } = await supabase
+                .from('payments')
+                .insert({
+                    user_id: userId,
+                    amount: amount,
+                    currency: 'USD', // Or INR based on Razorpay config
+                    status: 'paid',
+                    method: 'razorpay',
+                    plan_id: planId,
+                    provider_payment_id: razorpay_payment_id,
+                    provider_order_id: razorpay_order_id,
+                    metadata: {
+                        plan: planId,
+                        order_id: razorpay_order_id
+                    }
+                });
+
+            if (paymentError) console.error('Failed to store payment record:', paymentError);
 
             // Log activity
             await ActivityLogService.log(
@@ -117,22 +140,22 @@ exports.getPaymentHistory = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Fetch subscription upgrades from activity logs
-        const { data: logs, error } = await supabase
-            .from('activity_logs')
+        // Fetch payments from payments table
+        const { data: payments, error } = await supabase
+            .from('payments')
             .select('*')
             .eq('user_id', userId)
-            .eq('action', 'subscription.upgraded')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const history = logs.map(log => ({
-            id: log.metadata?.payment_id || 'N/A',
-            date: log.created_at,
-            amount: getPlanLimits(log.metadata?.plan).amount,
-            plan: log.metadata?.plan,
-            status: 'paid'
+        const history = payments.map(payment => ({
+            id: payment.provider_payment_id || payment.id,
+            date: payment.created_at,
+            amount: payment.amount,
+            plan: payment.plan_id,
+            status: payment.status,
+            description: `Subscription - ${payment.plan_id} Plan`
         }));
 
         res.json(history);
