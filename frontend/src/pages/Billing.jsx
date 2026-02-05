@@ -470,69 +470,8 @@ export default function Billing() {
                 </div>
             </div>
 
-            {/* Payment History Section */}
-            <div className="mb-12">
-                <h2 className="text-2xl font-bold text-white mb-2">Payment History</h2>
-                <p className="text-slate-400 text-sm mb-8">Download your previous invoices and receipts.</p>
+            {/* Payment History Section Moved to Settings -> Billing */}
 
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-800/50 bg-slate-950/30">
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Invoice ID</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Amount</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/30">
-                                {paymentHistory.length === 0 ? (
-                                    <tr className="group hover:bg-slate-800/10 transition-colors">
-                                        <td colSpan="5" className="px-8 py-6 text-sm text-slate-400 text-center">
-                                            No payment history found
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paymentHistory.map((payment) => (
-                                        <tr key={payment.id} className="group hover:bg-slate-800/10 transition-colors">
-                                            <td className="px-8 py-6 text-sm font-medium text-slate-300">{payment.id}</td>
-                                            <td className="px-8 py-6 text-sm text-slate-400">
-                                                {new Date(payment.date).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-8 py-6 text-sm font-bold text-white">${payment.amount}</td>
-                                            <td className="px-8 py-6">
-                                                <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">
-                                                    {payment.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleEmailReceipt(payment.id)}
-                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                                                        title="Email Receipt"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDownloadReceipt(payment.id)}
-                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                                                        title="Download Receipt"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </div >
     );
 }

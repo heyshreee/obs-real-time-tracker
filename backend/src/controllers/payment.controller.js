@@ -64,10 +64,15 @@ exports.verifyPayment = async (req, res) => {
 
         if (expectedSignature === razorpay_signature) {
             // Payment verified - Update user plan
+            // Calculate next billing date (Same day next month)
+            const nextBillingDate = new Date();
+            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
             const { error: updateError } = await supabase
                 .from('users')
                 .update({
-                    plan: planId
+                    plan: planId,
+                    next_billing_date: nextBillingDate
                 })
                 .eq('id', userId);
 
@@ -94,7 +99,10 @@ exports.verifyPayment = async (req, res) => {
                     }
                 });
 
-            if (paymentError) console.error('Failed to store payment record:', paymentError);
+            if (paymentError) {
+                console.error('Failed to store payment record:', paymentError);
+                throw new Error('Database insert failed: ' + paymentError.message);
+            }
 
             // Log activity
             await ActivityLogService.log(
@@ -170,25 +178,37 @@ exports.getReceipt = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
-        // Fetch payment details from Razorpay
-        const payment = await razorpay.payments.fetch(id);
+        console.log(`[Receipt] Request for ID: ${id} by User: ${userId}`);
 
-        if (!payment) {
-            return res.status(404).json({ error: 'Payment not found' });
+        // Fetch payment details from DB first (Source of Truth)
+        // We check both provider_payment_id (e.g. razorpay id) and internal id
+        let query = supabase
+            .from('payments')
+            .select('*')
+            .eq('user_id', userId);
+
+        // Check if ID is a valid UUID
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        if (isUUID) {
+            // It's a UUID, so it could be our internal ID or a provider ID (unlikely but possible)
+            query = query.or(`provider_payment_id.eq.${id},id.eq.${id}`);
+        } else {
+            // It's not a UUID (e.g. 'pay_...'), so it MUST be a provider_payment_id
+            query = query.eq('provider_payment_id', id);
         }
 
-        // Verify ownership via email (Razorpay stores email) or check if it exists in user's activity logs
-        // For stricter security, check if this payment_id exists in user's activity logs
-        const { data: log } = await supabase
-            .from('activity_logs')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('action', 'subscription.upgraded')
-            .contains('metadata', { payment_id: id })
-            .single();
+        const { data: paymentRecord, error } = await query.single();
 
-        if (!log) {
-            return res.status(403).json({ error: 'Access denied to this receipt' });
+        if (error) {
+            console.error('[Receipt] DB Query Error:', error);
+        } else {
+            console.log('[Receipt] Record found:', paymentRecord ? 'Yes' : 'No');
+        }
+
+        if (error || !paymentRecord) {
+            console.error('Payment not found in DB:', id);
+            return res.status(404).json({ error: 'Receipt not found' });
         }
 
         const user = {
@@ -196,11 +216,23 @@ exports.getReceipt = async (req, res) => {
             email: req.user.email
         };
 
+        // Construct payment object compatible with ReceiptService
+        // ReceiptService expects: amount in cents/paise, created_at in seconds, notes.planId
+        const paymentData = {
+            id: paymentRecord.provider_payment_id || paymentRecord.id,
+            created_at: new Date(paymentRecord.created_at).getTime() / 1000,
+            method: paymentRecord.method,
+            amount: paymentRecord.amount * 100, // Convert main unit to sub-unit (e.g. 29 -> 2900)
+            notes: {
+                planId: paymentRecord.plan_id
+            }
+        };
+
         // Set headers for PDF download
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=receipt_${id}.pdf`);
 
-        ReceiptService.generateReceipt(payment, user, res);
+        ReceiptService.generateReceipt(paymentData, user, res);
 
     } catch (error) {
         console.error('Get receipt error:', error);
@@ -220,7 +252,10 @@ exports.downgradePlan = async (req, res) => {
         // Update user plan
         const { error } = await supabase
             .from('users')
-            .update({ plan: 'free' })
+            .update({
+                plan: 'free',
+                next_billing_date: null
+            })
             .eq('id', userId);
 
         if (error) throw error;
@@ -260,24 +295,24 @@ exports.emailReceipt = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
 
-        // Fetch payment details from Razorpay
-        const payment = await razorpay.payments.fetch(id);
+        // Fetch payment details from DB
+        let query = supabase
+            .from('payments')
+            .select('*')
+            .eq('user_id', userId);
 
-        if (!payment) {
-            return res.status(404).json({ error: 'Payment not found' });
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        if (isUUID) {
+            query = query.or(`provider_payment_id.eq.${id},id.eq.${id}`);
+        } else {
+            query = query.eq('provider_payment_id', id);
         }
 
-        // Verify ownership
-        const { data: log } = await supabase
-            .from('activity_logs')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('action', 'subscription.upgraded')
-            .contains('metadata', { payment_id: id })
-            .single();
+        const { data: paymentRecord, error } = await query.single();
 
-        if (!log) {
-            return res.status(403).json({ error: 'Access denied to this receipt' });
+        if (error || !paymentRecord) {
+            return res.status(404).json({ error: 'Payment not found' });
         }
 
         const user = {
@@ -285,53 +320,24 @@ exports.emailReceipt = async (req, res) => {
             email: req.user.email
         };
 
-        // Generate PDF Buffer
-        const buffers = [];
-        const doc = new require('pdfkit')({ margin: 50 });
+        // Construct payment object
+        const paymentData = {
+            id: paymentRecord.provider_payment_id || paymentRecord.id,
+            created_at: new Date(paymentRecord.created_at).getTime() / 1000,
+            method: paymentRecord.method,
+            amount: paymentRecord.amount * 100,
+            notes: {
+                planId: paymentRecord.plan_id
+            }
+        };
 
-        doc.on('data', buffers.push.bind(buffers));
-        doc.on('end', async () => {
-            const pdfBuffer = Buffer.concat(buffers);
-
-            // Send Email
-            await EmailService.sendReceiptEmail(
-                user.email,
-                pdfBuffer,
-                id,
-                user.name || 'User'
-            );
-
-            res.json({ success: true, message: 'Receipt sent to email' });
-        });
-
-        // Generate content (Reuse logic or refactor ReceiptService to accept doc)
-        // For now, we'll duplicate the generation logic slightly or better, update ReceiptService to return doc or accept stream
-        // Let's modify ReceiptService to be more flexible, but for now, let's just use a temporary stream approach or refactor ReceiptService.
-        // Actually, ReceiptService.generateReceipt takes a res (stream). We can pass a PassThrough stream or just use the doc events as above.
-        // But ReceiptService creates its own doc. Let's refactor ReceiptService slightly to accept a doc or return one.
-        // Wait, ReceiptService.generateReceipt creates a NEW doc.
-        // Let's just update ReceiptService to allow passing a stream/doc or just copy the logic here for simplicity to avoid breaking existing code, 
-        // OR better: Update ReceiptService to accept a stream.
-
-        // Let's try to use ReceiptService.generateReceipt but pass a mock stream that collects data?
-        // No, ReceiptService creates the doc. 
-        // Let's update ReceiptService first to be more reusable.
-
-        // Actually, I'll just implement the generation here using the same logic for now to avoid breaking the other endpoint, 
-        // or I can modify ReceiptService in the next step to be reusable. 
-        // Let's modify ReceiptService in the next step. For now, I'll put a placeholder here and then update ReceiptService.
-
-        // Wait, I can't leave broken code.
-        // I will update ReceiptService FIRST in the next step, then come back here.
-        // But I'm already in this tool call.
-        // I will write the controller assuming ReceiptService.generatePDFBuffer exists, and then implement it.
-
-        const pdfBuffer = await ReceiptService.generatePDFBuffer(payment, user);
+        // Generate PDF Buffer using Service
+        const pdfBuffer = await ReceiptService.generatePDFBuffer(paymentData, user);
 
         await EmailService.sendReceiptEmail(
             user.email,
             pdfBuffer,
-            id,
+            paymentData.id,
             user.name || 'User'
         );
 
