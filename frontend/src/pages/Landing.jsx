@@ -30,7 +30,7 @@ export default function Landing() {
                             <BarChart2 className="h-5 w-5 text-white" />
                         </div>
                         <span className="text-xl font-bold text-white">
-                            OBS Tracker
+                            WebPluse Analytics
                         </span>
                     </div>
 
@@ -88,7 +88,7 @@ export default function Landing() {
                 {/* Hero Section */}
                 <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-20">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/20 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-wide uppercase mb-8">
-                        OBS TRACKER SOLUTIONS
+                        WEBPLUSE ANALYTICS SOLUTIONS
                     </div>
 
                     <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
@@ -127,7 +127,7 @@ export default function Landing() {
                                     <div className="w-3 h-3 rounded-full bg-yellow-500/20"></div>
                                     <div className="w-3 h-3 rounded-full bg-green-500/20"></div>
                                 </div>
-                                <div className="ml-4 text-xs text-slate-500 font-mono">OBS Tracker Dashboard</div>
+                                <div className="ml-4 text-xs text-slate-500 font-mono">WebPluse Analytics Dashboard</div>
                             </div>
                             {/* Fake UI Content */}
                             <div className="p-6 grid grid-cols-4 gap-6 h-full">
@@ -223,7 +223,7 @@ export default function Landing() {
                                     Trusted by over 5,000+ top-tier creators.
                                 </h2>
                                 <p className="text-slate-400 mb-8 leading-relaxed">
-                                    "OBS Tracker is the only analytics tool that gives me the granularity I need to understand my audience retention. It's completely changed how I plan my content schedule."
+                                    "WebPluse Analytics is the only analytics tool that gives me the granularity I need to understand my audience retention. It's completely changed how I plan my content schedule."
                                 </p>
                                 <div className="flex items-center gap-4">
                                     <div className="h-12 w-12 rounded-full bg-slate-800 border border-white/10"></div>
@@ -370,7 +370,7 @@ export default function Landing() {
                         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
                         <div className="relative z-10">
                             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Your growth starts with better data.</h2>
-                            <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join thousands of creators who are using OBS Tracker to build their audience.</p>
+                            <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join thousands of creators who are using WebPluse Analytics to build their audience.</p>
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                                 <Link
                                     to="/register"
@@ -398,7 +398,7 @@ export default function Landing() {
                                     <div className="bg-blue-600 p-1.5 rounded-lg">
                                         <BarChart2 className="h-5 w-5 text-white" />
                                     </div>
-                                    <span className="text-xl font-bold text-white">OBS Tracker</span>
+                                    <span className="text-xl font-bold text-white">WebPluse Analytics</span>
                                 </div>
                                 <p className="text-slate-500 text-sm leading-relaxed">
                                     The advanced analytics platform for modern content creators. Track, analyze, and grow.
@@ -432,7 +432,7 @@ export default function Landing() {
                             </div>
                         </div>
                         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <p className="text-slate-600 text-sm">© 2026 OBS Tracker Inc. All rights reserved.</p>
+                            <p className="text-slate-600 text-sm">© 2026 WebPluse Analytics Inc. All rights reserved.</p>
                             <div className="flex gap-6 text-slate-500">
                                 <a href="#" className="hover:text-white transition-colors">Twitter</a>
                                 <a href="#" className="hover:text-white transition-colors">GitHub</a>

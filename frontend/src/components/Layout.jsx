@@ -186,7 +186,7 @@ export default function Layout() {
                         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-blue-500/20">
                             <Activity className="h-5 w-5" />
                         </div>
-                        <span className="text-xl font-bold text-white tracking-tight">OBS Tracker</span>
+                        <span className="text-xl font-bold text-white tracking-tight">WebPluse Analytics</span>
                     </div>
 
 
@@ -313,7 +313,7 @@ export default function Layout() {
                                 <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
                                     <Activity className="h-5 w-5" />
                                 </div>
-                                <span className="text-xl font-bold text-white tracking-tight">OBS Tracker</span>
+                                <span className="text-xl font-bold text-white tracking-tight">WebPluse Analytics</span>
                             </Link>
                         )}
                     </div>
