@@ -175,44 +175,90 @@ export default function Landing() {
                         <p className="text-slate-400 max-w-2xl mx-auto">Everything you need to take your content to the next level.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid lg:grid-cols-3 gap-8 mb-24">
                         {[
                             {
                                 icon: <Activity className="h-6 w-6 text-blue-400" />,
                                 color: "bg-blue-500/10",
                                 title: "Real-time Activity Logs",
-                                desc: "Monitor every visitor action as it happens. Watch your traffic grow live with instant updates."
+                                desc: "Track every visitor action as it happens — not minutes later. WebPulse captures live events such as page visits, session starts, and engagement activity in real time using WebSockets. This allows you to react instantly to audience behavior instead of guessing based on outdated data.",
+                                get: ["Live visitor activity feed", "Real-time page and session tracking", "Instant data updates without refresh", "Low-latency event delivery"],
+                                why: ["Perfect for live streams and launches", "Immediate insight into traffic spikes", "No waiting for analytics reports"]
                             },
                             {
                                 icon: <Layout className="h-6 w-6 text-purple-400" />,
                                 color: "bg-purple-500/10",
                                 title: "Multi-Project Management",
-                                desc: "Manage multiple channels or shows from a single dashboard. Switch contexts instantly without losing data."
+                                desc: "Manage multiple websites, streams, or applications from one centralized dashboard. Each project is fully isolated with its own tracking ID and data stream. You can switch between projects instantly without losing context or data.",
+                                get: ["Multiple project support", "Dedicated tracking IDs per project", "Fast project switching", "Secure data separation"],
+                                why: ["Ideal for agencies, creators, and dev teams", "One account, many projects", "Clean organization without complexity"]
                             },
                             {
                                 icon: <Bell className="h-6 w-6 text-teal-400" />,
                                 color: "bg-teal-500/10",
                                 title: "Instant Usage Alerts",
-                                desc: "Get notified immediately when you hit viewer milestones or if stream performance degrades."
+                                desc: "Stay informed the moment something changes. WebPulse monitors usage patterns and notifies you immediately when predefined thresholds are reached — whether that’s a surge in viewers or a sudden performance drop.",
+                                get: ["Real-time usage notifications", "Viewer milestone alerts", "Performance degradation alerts", "Custom alert thresholds"],
+                                why: ["React before problems escalate", "Never miss peak engagement moments", "Better stream and site reliability"]
                             }
                         ].map((feature, i) => (
-                            <div key={i} className="p-8 rounded-3xl bg-[#151921] border border-white/5 hover:border-white/10 transition-colors group">
+                            <div key={i} className="p-8 rounded-3xl bg-[#151921] border border-white/5 hover:border-white/10 transition-colors group flex flex-col">
                                 <div className={`h-14 w-14 rounded-2xl ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                                     {feature.icon}
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-                                <p className="text-slate-400 leading-relaxed text-sm">{feature.desc}</p>
+                                <p className="text-slate-400 leading-relaxed text-sm mb-8">{feature.desc}</p>
 
-                                <ul className="mt-6 space-y-2">
-                                    <li className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div> Instant setup
-                                    </li>
-                                    <li className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div> No hardware required
-                                    </li>
-                                </ul>
+                                <div className="space-y-6 mt-auto">
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">What you get</h4>
+                                        <ul className="space-y-2">
+                                            {feature.get.map((item, j) => (
+                                                <li key={j} className="flex items-start gap-2 text-xs text-slate-400 font-medium">
+                                                    <Check className="h-3.5 w-3.5 text-blue-500 mt-0.5" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Why it matters</h4>
+                                        <ul className="space-y-2">
+                                            {feature.why.map((item, j) => (
+                                                <li key={j} className="flex items-start gap-2 text-xs text-slate-400 font-medium">
+                                                    <Star className="h-3.5 w-3.5 text-purple-500 mt-0.5" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Technical Highlights */}
+                    <div className="max-w-4xl mx-auto rounded-3xl bg-[#0B0E14] border border-white/10 p-8 md:p-12">
+                        <div className="text-center mb-10">
+                            <h3 className="text-2xl font-bold text-white mb-4">Technical Highlights</h3>
+                            <p className="text-slate-400">Built with performance and scalability in mind.</p>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-x-12 gap-y-4">
+                            {[
+                                "WebSocket-based real-time updates",
+                                "REST APIs for integration",
+                                "Lightweight tracking script",
+                                "Optimized for low CPU and memory usage",
+                                "Works with React, Node.js, Express, and MongoDB",
+                                "OBS overlay and dashboard friendly",
+                                "No hardware. No plugins. No complex configuration."
+                            ].map((tech, i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                                    <span className="text-slate-300 text-sm font-medium">{tech}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </section>
 
