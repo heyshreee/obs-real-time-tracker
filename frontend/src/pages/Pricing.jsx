@@ -34,84 +34,110 @@ export default function Pricing() {
                         </p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-32">
-                        {/* STARTER */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">STARTER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$0</span>
+                    {/* Pricing Cards */}
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-32">
+                        {/* Free */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Free</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹0</span>
                                 <span className="text-slate-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 5 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Basic Analytics
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
+                            <div className="text-xs text-slate-500 mb-6">$0 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Trying WebPulse</p>
+
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
                                 Get Started
                             </Link>
                         </div>
 
-                        {/* PRO STREAMER */}
-                        <div className="p-8 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-blue-500 rounded-full text-xs font-bold text-white border border-blue-400">MOST POPULAR</div>
-                            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-2">PRO STREAMER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$29</span>
+                        {/* Basic */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-2">Basic</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹299</span>
+                                <span className="text-slate-500">/mo</span>
+                            </div>
+                            <div className="text-xs text-slate-500 mb-6">$4 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Students & solo devs</p>
+
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/50 text-center text-sm font-medium hover:bg-blue-600/20 transition-colors">
+                                Choose Basic
+                            </Link>
+                        </div>
+
+                        {/* Pro */}
+                        <div className="p-6 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform lg:-translate-y-4">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-500 rounded-full text-[10px] font-bold text-white border border-blue-400 tracking-wide">MOST POPULAR</div>
+                            <h3 className="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">Pro</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹999</span>
                                 <span className="text-blue-200">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> AI-Powered Insights
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Email Notifications
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl bg-white text-blue-600 text-center font-bold hover:bg-blue-50 transition-colors">
+                            <div className="text-xs text-blue-200 mb-6">$12 / month</div>
+                            <p className="text-sm text-blue-100 mb-6 min-h-[40px]">Streamers & growing apps</p>
+
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-white text-blue-600 text-center text-sm font-bold hover:bg-blue-50 transition-colors">
                                 Start Free Trial
                             </Link>
                         </div>
 
-                        {/* SCALE / ORG */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">SCALE / ORG</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">Custom</span>
+                        {/* Business */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-2">Business</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹2,999</span>
+                                <span className="text-slate-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom volume
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Advanced AI Models
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom Email Reports
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
+                            <div className="text-xs text-slate-500 mb-6">$39 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Teams & high traffic</p>
+
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
                                 Contact Sales
                             </Link>
                         </div>
+                    </div>
+
+                    {/* Feature Comparison Table */}
+                    <div className="max-w-7xl mx-auto mb-32 overflow-x-auto">
+                        <h2 className="text-3xl font-bold text-white mb-12 text-center">Compare Plans</h2>
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-white/10">
+                                    <th className="py-6 px-4 text-sm font-semibold text-slate-400">Feature</th>
+                                    <th className="py-6 px-4 text-sm font-bold text-white">Free</th>
+                                    <th className="py-6 px-4 text-sm font-bold text-blue-400">Basic</th>
+                                    <th className="py-6 px-4 text-sm font-bold text-blue-500 bg-blue-500/10 rounded-t-xl">Pro</th>
+                                    <th className="py-6 px-4 text-sm font-bold text-purple-400">Business</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {[
+                                    { feature: "Projects", free: "1", basic: "5", pro: "15", business: "Unlimited*" },
+                                    { feature: "Events / month", free: "1,000", basic: "50,000", pro: "500,000", business: "5,000,000" },
+                                    { feature: "Real-time analytics", free: "Basic", basic: "Yes", pro: "Advanced", business: "Advanced" },
+                                    { feature: "Dashboard refresh rate", free: "60 sec", basic: "10 sec", pro: "1 sec", business: "Real-time (WebSocket)" },
+                                    { feature: "OBS overlay", free: "Default only", basic: "Custom text & theme", pro: "Fully customizable", business: "Fully customizable" },
+                                    { feature: "Visitor geolocation", free: "—", basic: "—", pro: "Country-level", business: "Country-level" },
+                                    { feature: "Device & browser stats", free: "—", basic: "—", pro: "Yes", business: "Yes" },
+                                    { feature: "Tracking URL + API key", free: "—", basic: "Yes", pro: "Yes", business: "Yes" },
+                                    { feature: "Team access / roles", free: "—", basic: "—", pro: "—", business: "Yes" },
+                                    { feature: "Private dashboards", free: "—", basic: "—", pro: "—", business: "Yes" },
+                                    { feature: "Custom domain tracking", free: "—", basic: "—", pro: "—", business: "Yes" },
+                                    { feature: "Data retention", free: "24 hours", basic: "7 days", pro: "30 days", business: "90 days" },
+                                    { feature: "Support", free: "Community", basic: "Email", pro: "Priority email", business: "Dedicated + SLA" },
+                                    { feature: "Upgrade friction", free: "High", basic: "Medium", pro: "Low", business: "Custom" }
+                                ].map((row, i) => (
+                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                        <td className="py-4 px-4 text-sm text-slate-300 font-medium">{row.feature}</td>
+                                        <td className="py-4 px-4 text-sm text-slate-400">{row.free}</td>
+                                        <td className="py-4 px-4 text-sm text-slate-400">{row.basic}</td>
+                                        <td className="py-4 px-4 text-sm text-white bg-blue-500/5 font-medium">{row.pro}</td>
+                                        <td className="py-4 px-4 text-sm text-slate-400">{row.business}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
 
                     {/* FAQ */}

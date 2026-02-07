@@ -4,33 +4,51 @@ const NotificationService = require('./notification.service');
 const PLAN_LIMITS = {
     free: {
         monthlyViews: 1000,
+        storageLimit: 100 * 1024 * 1024, // 100MB (approx for 24h retention of low volume)
+        projectLimit: 1,
+        liveLogs: false,
+        refreshRate: 60, // seconds
+        emailIntegrity: false,
+        allowedOriginsLimit: 1,
+        share_report: 0,
+        retentionDays: 1,
+        amount: 0
+    },
+    basic: {
+        monthlyViews: 50000,
         storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
         projectLimit: 5,
         liveLogs: false,
+        refreshRate: 10,
         emailIntegrity: false,
-        allowedOriginsLimit: 1,
+        allowedOriginsLimit: 3,
         share_report: 5,
-        amount: 0
+        retentionDays: 7,
+        amount: 4 // $4 (approx ₹299)
     },
     pro: {
-        monthlyViews: 100000,
+        monthlyViews: 500000,
         storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 10,
-        liveLogs: true,
+        projectLimit: 15,
+        liveLogs: false, // 1 sec refresh is not true "live" websocket in this context, or is it? Request says "1 sec" vs "Real-time (WebSocket)". Keeping false but low refresh rate.
+        refreshRate: 1,
         emailIntegrity: true,
         allowedOriginsLimit: 10,
-        share_report: 100,
-        amount: 29
+        share_report: 20,
+        retentionDays: 30,
+        amount: 12 // $12 (approx ₹999)
     },
-    enterprise: {
-        monthlyViews: 1000000000, // Effectively unlimited
-        storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
-        projectLimit: 100,
+    business: {
+        monthlyViews: 5000000,
+        storageLimit: 50 * 1024 * 1024 * 1024, // 50GB
+        projectLimit: 100, // Unlimited* (capped for safety)
         liveLogs: true,
+        refreshRate: 0, // Real-time
         emailIntegrity: true,
-        allowedOriginsLimit: 999,
-        share_report: Infinity,
-        amount: 'custom'
+        allowedOriginsLimit: 100,
+        share_report: 100,
+        retentionDays: 90,
+        amount: 39 // $39 (approx ₹2,999)
     }
 };
 
