@@ -307,81 +307,135 @@ export default function Landing() {
                         <p className="text-slate-400">The perfect plan for every stage of your journey.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                        {/* STARTER */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">STARTER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$0</span>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                        {/* Free */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Free</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹0</span>
                                 <span className="text-slate-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
+                            <div className="text-xs text-slate-500 mb-6">$0 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Trying WebPulse</p>
+
+                            <ul className="space-y-3 mb-8 flex-1">
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Project
                                 </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 5 Projects
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Allowed Origin
                                 </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Basic Analytics
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1,000 events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 60 sec dashboard refresh
+                                </li>
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Basic Analytics
                                 </li>
                             </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
                                 Get Started
                             </Link>
                         </div>
 
-                        {/* PRO STREAMER */}
-                        <div className="p-8 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-blue-500 rounded-full text-xs font-bold text-white border border-blue-400">MOST POPULAR</div>
-                            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-2">PRO STREAMER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$29</span>
-                                <span className="text-blue-200">/mo</span>
+                        {/* Basic */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-2">Basic</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹299</span>
+                                <span className="text-slate-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100,000 events/mo
+                            <div className="text-xs text-slate-500 mb-6">$4 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Students & solo devs</p>
+
+                            <ul className="space-y-3 mb-8 flex-1">
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 5 Projects
                                 </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100 Projects
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 3 Allowed Origins
                                 </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> AI-Powered Insights
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 50,000 events/mo
                                 </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 10 sec dashboard refresh
                                 </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Email Notifications
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Real-time Analytics
                                 </li>
                             </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl bg-white text-blue-600 text-center font-bold hover:bg-blue-50 transition-colors">
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/50 text-center text-sm font-medium hover:bg-blue-600/20 transition-colors">
+                                Choose Basic
+                            </Link>
+                        </div>
+
+                        {/* Pro */}
+                        <div className="p-6 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform lg:-translate-y-4">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-500 rounded-full text-[10px] font-bold text-white border border-blue-400 tracking-wide">MOST POPULAR</div>
+                            <h3 className="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">Pro</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹999</span>
+                                <span className="text-blue-200">/mo</span>
+                            </div>
+                            <div className="text-xs text-blue-200 mb-6">$12 / month</div>
+                            <p className="text-sm text-blue-100 mb-6 min-h-[40px]">Streamers & growing apps</p>
+
+                            <ul className="space-y-3 mb-8 flex-1">
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 15 Projects
+                                </li>
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 10 Allowed Origins
+                                </li>
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 500,000 events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 1 sec dashboard refresh
+                                </li>
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> Advanced Analytics
+                                </li>
+                                <li className="flex items-center gap-2 text-white text-xs">
+                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> Priority Support
+                                </li>
+                            </ul>
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-white text-blue-600 text-center text-sm font-bold hover:bg-blue-50 transition-colors">
                                 Start Free Trial
                             </Link>
                         </div>
 
-                        {/* SCALE / ORG */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">SCALE / ORG</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">Custom</span>
+                        {/* Business */}
+                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+                            <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-2">Business</h3>
+                            <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-3xl font-bold text-white">₹2,999</span>
+                                <span className="text-slate-500">/mo</span>
                             </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom volume
+                            <div className="text-xs text-slate-500 mb-6">$39 / month</div>
+                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Teams & high traffic</p>
+
+                            <ul className="space-y-3 mb-8 flex-1">
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Unlimited Projects
                                 </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 Projects
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 100 Allowed Origins
                                 </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Advanced AI Models
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 5,000,000 events/mo
                                 </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom Email Reports
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Real-time / SLA
+                                </li>
+                                <li className="flex items-center gap-2 text-slate-300 text-xs">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Team access
                                 </li>
                             </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
+                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
                                 Contact Sales
                             </Link>
                         </div>

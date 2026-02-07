@@ -114,6 +114,7 @@ export default function Pricing() {
                             <tbody className="divide-y divide-white/5">
                                 {[
                                     { feature: "Projects", free: "1", basic: "5", pro: "15", business: "Unlimited*" },
+                                    { feature: "Allowed Origins", free: "1", basic: "3", pro: "10", business: "100" },
                                     { feature: "Events / month", free: "1,000", basic: "50,000", pro: "500,000", business: "5,000,000" },
                                     { feature: "Real-time analytics", free: "Basic", basic: "Yes", pro: "Advanced", business: "Advanced" },
                                     { feature: "Dashboard refresh rate", free: "60 sec", basic: "10 sec", pro: "1 sec", business: "Real-time (WebSocket)" },

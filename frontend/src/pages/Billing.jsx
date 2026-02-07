@@ -332,138 +332,170 @@ export default function Billing() {
                 <h2 className="text-2xl font-bold text-white mb-2">Choose your plan</h2>
                 <p className="text-slate-400 text-sm mb-10">Pick the best plan that fits your growth needs.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {/* Free Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Free</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Perfect for side projects and small experiments.</p>
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-6 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-bold text-white mb-1">Free</h3>
+                            <p className="text-xs text-slate-400">Trying WebPulse</p>
                         </div>
 
-                        <div className="mb-10">
+                        <div className="mb-6">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-white">$0</span>
-                                <span className="text-slate-500 font-medium">/month</span>
+                                <span className="text-3xl font-bold text-white">₹0</span>
+                                <span className="text-slate-500 font-medium text-xs">/mo</span>
                             </div>
+                            <div className="text-xs text-slate-500">$0 / month</div>
                         </div>
 
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">{(usageStats?.monthlyViews || 1000).toLocaleString()} Views / mo</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">{usageStats?.projectLimit || 5} Active Projects</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-slate-500">
-                                <div className="w-5 h-5 rounded-full bg-slate-800/50 flex items-center justify-center flex-shrink-0">
-                                    <X className="h-3 w-3" />
-                                </div>
-                                <span>Priority Support</span>
-                            </div>
+                        <div className="space-y-3 mb-8 flex-1">
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Project
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Allowed Origin
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1,000 events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 60 sec refresh
+                                </li>
+                            </ul>
                         </div>
 
                         <button
                             onClick={handleDowngrade}
                             disabled={usageStats.plan === 'free' || loading}
-                            className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
+                            className="w-full py-3 rounded-xl font-bold text-sm transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
                         >
-                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade to Free'}
+                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade'}
+                        </button>
+                    </div>
+
+                    {/* Basic Plan */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-6 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-bold text-blue-400 mb-1">Basic</h3>
+                            <p className="text-xs text-slate-400">Students & solo devs</p>
+                        </div>
+
+                        <div className="mb-6">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-3xl font-bold text-white">₹299</span>
+                                <span className="text-slate-500 font-medium text-xs">/mo</span>
+                            </div>
+                            <div className="text-xs text-slate-500">$4 / month</div>
+                        </div>
+
+                        <div className="space-y-3 mb-8 flex-1">
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 5 Projects
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 3 Allowed Origins
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 50,000 events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 10 sec refresh
+                                </li>
+                            </ul>
+                        </div>
+
+                        <button
+                            onClick={() => handleUpgrade('basic')}
+                            disabled={usageStats.plan === 'basic' || loading}
+                            className="w-full py-3 rounded-xl font-bold text-sm transition-all bg-blue-600/10 text-blue-400 border border-blue-500/50 hover:bg-blue-600/20 disabled:opacity-50 disabled:cursor-default"
+                        >
+                            {usageStats.plan === 'basic' ? 'Active Plan' : 'Upgrade to Basic'}
                         </button>
                     </div>
 
                     {/* Pro Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-blue-600/50 rounded-3xl p-8 flex flex-col h-full relative shadow-[0_0_40px_rgba(37,99,235,0.1)] group">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                            <span className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg shadow-blue-600/20">Recommended</span>
+                    <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-blue-600/50 rounded-3xl p-6 flex flex-col h-full relative shadow-[0_0_40px_rgba(37,99,235,0.1)] group lg:-translate-y-4">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg shadow-blue-600/20">Popular</span>
                         </div>
 
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Scale your monitoring with unlimited power.</p>
+                        <div className="mb-6 mt-2">
+                            <h3 className="text-lg font-bold text-white mb-1">Pro</h3>
+                            <p className="text-xs text-slate-400">Streamers & growing apps</p>
                         </div>
 
-                        <div className="mb-10">
+                        <div className="mb-6">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-white">$29</span>
-                                <span className="text-slate-500 font-medium">/month</span>
+                                <span className="text-3xl font-bold text-white">₹999</span>
+                                <span className="text-slate-500 font-medium text-xs">/mo</span>
                             </div>
+                            <div className="text-xs text-slate-500">$12 / month</div>
                         </div>
 
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Unlimited Views</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Unlimited Projects</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Priority Email Support</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Custom Domain Tracking</span>
-                            </div>
+                        <div className="space-y-3 mb-8 flex-1">
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-green-500 shrink-0" /> 15 Projects
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-green-500 shrink-0" /> 10 Allowed Origins
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-green-500 shrink-0" /> 500,000 events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-green-500 shrink-0" /> 1 sec refresh
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-green-500 shrink-0" /> Priority Support
+                                </li>
+                            </ul>
                         </div>
 
                         <button
-                            onClick={() => handleUpgrade('pro', 29)}
+                            onClick={() => handleUpgrade('pro')}
                             disabled={usageStats.plan === 'pro' || loading}
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
                         >
                             {usageStats.plan === 'pro' ? 'Active Plan' : 'Upgrade to Pro'}
                         </button>
                     </div>
 
-                    {/* Enterprise Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Custom features and dedicated infrastructure.</p>
+                    {/* Business Plan */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-6 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-bold text-purple-400 mb-1">Business</h3>
+                            <p className="text-xs text-slate-400">Teams & high traffic</p>
                         </div>
 
-                        <div className="mb-10">
-                            <h3 className="text-4xl font-bold text-white">Custom</h3>
+                        <div className="mb-6">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-3xl font-bold text-white">₹2,999</span>
+                                <span className="text-slate-500 font-medium text-xs">/mo</span>
+                            </div>
+                            <div className="text-xs text-slate-500">$39 / month</div>
                         </div>
 
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">White-label Reports</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">API Access</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Dedicated Manager</span>
-                            </div>
+                        <div className="space-y-3 mb-8 flex-1">
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Unlimited Projects
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 100 Allowed Origins
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 5M events/mo
+                                </li>
+                                <li className="flex items-center gap-2 text-xs text-slate-300">
+                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Real-time / SLA
+                                </li>
+                            </ul>
                         </div>
 
-                        <button className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 active:scale-[0.98]">
+                        <button className="w-full py-3 rounded-xl font-bold text-sm transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 active:scale-[0.98]">
                             Contact Sales
                         </button>
                     </div>
