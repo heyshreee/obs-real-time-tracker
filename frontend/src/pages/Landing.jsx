@@ -1,24 +1,91 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    BarChart2,
-    Shield,
-    Zap,
-    Check,
-    Play,
-    Layout,
-    Bell,
-    Star,
-    Users,
     Activity,
+    Zap,
+    Shield,
+    Globe,
+    BarChart3,
     Clock,
+    Check,
     Menu,
-    X
+    X,
+    ChevronRight,
+    Users,
+    Layers,
+    Lock
 } from 'lucide-react';
 
 export default function Landing() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [plans, setPlans] = useState([
+        {
+            id: 'free',
+            name: 'Free',
+            price_usd: 0,
+            price_inr: 0,
+            features: ['1 Project', '1 Allowed Origin', '1,000 events/mo', '60 sec refresh', 'Basic Analytics'],
+            max_projects: 1,
+            allowed_origins: 1,
+            monthly_events: 1000,
+            live_logs: false
+        },
+        {
+            id: 'basic',
+            name: 'Basic',
+            price_usd: 4,
+            price_inr: 299,
+            features: ['5 Projects', '3 Allowed Origins', 'Live Device Stats', '50,000 events/mo', '10 sec refresh', 'Real-time Analytics'],
+            max_projects: 5,
+            allowed_origins: 3,
+            monthly_events: 50000,
+            live_logs: false
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price_usd: 12,
+            price_inr: 999,
+            features: ['15 Projects', '10 Allowed Origins', 'Live Activity Logs', '500,000 events/mo', '1 sec refresh', 'Advanced Analytics', 'Priority Support'],
+            max_projects: 15,
+            allowed_origins: 10,
+            monthly_events: 500000,
+            live_logs: true
+        },
+        {
+            id: 'business',
+            name: 'Business',
+            price_usd: 39,
+            price_inr: 2999,
+            features: ['Unlimited Projects', '100 Allowed Origins', '5,000,000 events/mo', 'Real-time / SLA', 'Team access'],
+            max_projects: 100,
+            allowed_origins: 100,
+            monthly_events: 5000000,
+            live_logs: true
+        }
+    ]);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                const res = await fetch(`${API_URL}/api/plans`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setPlans(data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching plans:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#0B0E14] text-white selection:bg-blue-500/30 font-sans">
@@ -307,139 +374,108 @@ export default function Landing() {
                         <p className="text-slate-400">The perfect plan for every stage of your journey.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-                        {/* Free */}
-                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Free</h3>
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl font-bold text-white">₹0</span>
-                                <span className="text-slate-500">/mo</span>
-                            </div>
-                            <div className="text-xs text-slate-500 mb-6">$0 / month</div>
-                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Trying WebPulse</p>
-
-                            <ul className="space-y-3 mb-8 flex-1">
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Project
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1 Allowed Origin
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 1,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 60 sec dashboard refresh
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Basic Analytics
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
-                                Get Started
-                            </Link>
+                    {loading ? (
+                        <div className="flex justify-center items-center py-20">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                         </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                            {plans.map((plan) => {
+                                const isPro = plan.id === 'pro';
+                                const isBusiness = plan.id === 'business';
+                                const isBasic = plan.id === 'basic';
+                                const isFree = plan.id === 'free';
 
-                        {/* Basic */}
-                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
-                            <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-2">Basic</h3>
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl font-bold text-white">₹299</span>
-                                <span className="text-slate-500">/mo</span>
-                            </div>
-                            <div className="text-xs text-slate-500 mb-6">$4 / month</div>
-                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Students & solo devs</p>
+                                return (
+                                    <div key={plan.id} className={`p-6 rounded-3xl flex flex-col transition-all duration-300 relative ${isPro
+                                        ? 'bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 transform lg:-translate-y-4'
+                                        : isBusiness
+                                            ? 'bg-gradient-to-b from-[#151921] to-blue-900/20 border border-blue-500/30 hover:border-blue-500/50'
+                                            : 'bg-[#151921] border border-white/5 hover:border-white/10'
+                                        }`}>
+                                        {isPro && (
+                                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-500 rounded-full text-[10px] font-bold text-white border border-blue-400 tracking-wide">MOST POPULAR</div>
+                                        )}
 
-                            <ul className="space-y-3 mb-8 flex-1">
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 5 Projects
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 3 Allowed Origins
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 50,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> 10 sec dashboard refresh
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Real-time Analytics
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/50 text-center text-sm font-medium hover:bg-blue-600/20 transition-colors">
-                                Choose Basic
-                            </Link>
+                                        <h3 className={`text-sm font-bold uppercase tracking-wider mb-2 ${isPro ? 'text-blue-100' : isBasic || isBusiness ? 'text-blue-400' : 'text-slate-400'
+                                            }`}>{plan.name}</h3>
+
+                                        <div className="flex items-baseline gap-1 mb-1">
+                                            <span className={`text-3xl font-bold ${isPro ? 'text-white' : 'text-white'}`}>
+                                                {!plan.price_inr && !plan.price_usd ? 'Free' : `₹${plan.price_inr}`}
+                                            </span>
+                                            {(plan.price_inr > 0) && <span className={isPro ? 'text-blue-200' : 'text-slate-500'}>/mo</span>}
+                                        </div>
+
+                                        <div className={`text-xs mb-6 ${isPro ? 'text-blue-200' : 'text-slate-500'}`}>
+                                            {plan.price_usd > 0 ? `$${plan.price_usd} / month` : '$0 / month'}
+                                        </div>
+
+                                        <p className={`text-sm mb-6 min-h-[40px] ${isPro ? 'text-blue-100' : 'text-slate-400'}`}>
+                                            {plan.id === 'free' && 'Trying WebPulse'}
+                                            {plan.id === 'basic' && 'Students & solo devs'}
+                                            {plan.id === 'pro' && 'Streamers & growing apps'}
+                                            {plan.id === 'business' && 'Scale-ups & teams'}
+                                        </p>
+
+                                        <ul className="space-y-3 mb-8 flex-1">
+                                            {/* Feature list from plan features JSON if available, else usage limits */}
+                                            {plan.features && plan.features.length > 0 ? (
+                                                // If backend returns formatted features list (preferred for UI consistency)
+                                                // Assuming specific structure or defaulting to constructing it
+                                                plan.features.slice(0, 6).map((feature, idx) => ( // Show top 6 features
+                                                    <li key={idx} className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {feature.text || feature}
+                                                    </li>
+                                                ))
+                                            ) : (
+                                                // Fallback to constructing user-friendly list from limits if "features" array is empty/missing
+                                                <>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.max_projects === 100 ? 'Unlimited' : plan.max_projects} Projects
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.allowed_origins} Allowed Origin{plan.allowed_origins > 1 ? 's' : ''}
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(plan.monthly_events)} events/mo
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.refresh_rate === 0 ? 'Real-time' : `${plan.refresh_rate} sec`} dashboard refresh
+                                                    </li>
+                                                    {plan.live_logs && (
+                                                        <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                            <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                            Live Activity Logs
+                                                        </li>
+                                                    )}
+                                                </>
+                                            )}
+                                        </ul>
+
+                                        <Link
+                                            to="/register"
+                                            className={`block w-full py-2.5 px-4 rounded-xl text-center text-sm font-medium transition-colors ${isPro
+                                                ? 'bg-white text-blue-600 hover:bg-blue-50'
+                                                : isBasic
+                                                    ? 'bg-blue-600/10 text-blue-400 border border-blue-500/50 hover:bg-blue-600/20'
+                                                    : isBusiness
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-900/20'
+                                                        : 'border border-white/10 text-white hover:bg-white/5'
+                                                }`}
+                                        >
+                                            {isFree ? 'Get Started' : `Choose ${plan.name}`}
+                                        </Link>
+                                    </div>
+                                );
+                            })}
                         </div>
-
-                        {/* Pro */}
-                        <div className="p-6 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform lg:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-500 rounded-full text-[10px] font-bold text-white border border-blue-400 tracking-wide">MOST POPULAR</div>
-                            <h3 className="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">Pro</h3>
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl font-bold text-white">₹999</span>
-                                <span className="text-blue-200">/mo</span>
-                            </div>
-                            <div className="text-xs text-blue-200 mb-6">$12 / month</div>
-                            <p className="text-sm text-blue-100 mb-6 min-h-[40px]">Streamers & growing apps</p>
-
-                            <ul className="space-y-3 mb-8 flex-1">
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 15 Projects
-                                </li>
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 10 Allowed Origins
-                                </li>
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 500,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> 1 sec dashboard refresh
-                                </li>
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> Advanced Analytics
-                                </li>
-                                <li className="flex items-center gap-2 text-white text-xs">
-                                    <Check className="h-3.5 w-3.5 text-white shrink-0" /> Priority Support
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl bg-white text-blue-600 text-center text-sm font-bold hover:bg-blue-50 transition-colors">
-                                Start Free Trial
-                            </Link>
-                        </div>
-
-                        {/* Business */}
-                        <div className="p-6 rounded-3xl bg-[#151921] border border-white/5 flex flex-col hover:border-white/10 transition-all">
-                            <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-2">Business</h3>
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl font-bold text-white">₹2,999</span>
-                                <span className="text-slate-500">/mo</span>
-                            </div>
-                            <div className="text-xs text-slate-500 mb-6">$39 / month</div>
-                            <p className="text-sm text-slate-400 mb-6 min-h-[40px]">Teams & high traffic</p>
-
-                            <ul className="space-y-3 mb-8 flex-1">
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Unlimited Projects
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 100 Allowed Origins
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 5,000,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Real-time / SLA
-                                </li>
-                                <li className="flex items-center gap-2 text-slate-300 text-xs">
-                                    <Check className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Team access
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-2.5 px-4 rounded-xl border border-white/10 text-white text-center text-sm font-medium hover:bg-white/5 transition-colors">
-                                Contact Sales
-                            </Link>
-                        </div>
-                    </div>
+                    )}
                 </section>
 
                 {/* Stats */}

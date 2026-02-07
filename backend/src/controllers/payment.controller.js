@@ -8,25 +8,32 @@ const ReceiptService = require('../services/receipt.service');
 
 exports.createOrder = async (req, res) => {
     try {
-        const { planId } = req.body;
+        const { planId, currency = 'INR' } = req.body;
         const userId = req.user.id;
 
-        const planLimits = getPlanLimits(planId);
-        const amount = planLimits.amount;
+        const planLimits = await getPlanLimits(planId);
+
+        let amount;
+        if (currency === 'USD') {
+            amount = planLimits.price_usd; // Amount in Dollars
+        } else {
+            amount = planLimits.price_inr; // Amount in Rupees
+        }
 
         if (amount === 'custom' || amount === undefined) {
             return res.status(400).json({ error: 'Invalid plan or custom pricing required' });
         }
 
+        // Free plan check
         if (amount === 0) {
             return res.status(400).json({ error: 'Free plan cannot be purchased' });
         }
 
-        console.log('Creating order for:', { userId, planId, amount });
+        console.log('Creating order for:', { userId, planId, amount, currency });
 
         const options = {
-            amount: amount * 100, // Amount in paise
-            currency: 'INR',
+            amount: amount * 100, // Amount in smallest currency unit (paise or cents)
+            currency: currency,
             receipt: `rcpt_${Date.now().toString().slice(-10)}_${Math.floor(Math.random() * 1000)}`,
             notes: {
                 userId,
@@ -79,15 +86,21 @@ exports.verifyPayment = async (req, res) => {
             if (updateError) throw updateError;
 
             // Store payment record
-            const planLimits = getPlanLimits(planId);
-            const amount = planLimits.amount;
+            const planLimits = await getPlanLimits(planId);
+            const currency = req.body.currency || 'INR';
+            let amount;
+            if (currency === 'USD') {
+                amount = planLimits.price_usd;
+            } else {
+                amount = planLimits.price_inr;
+            }
 
             const { error: paymentError } = await supabase
                 .from('payments')
                 .insert({
                     user_id: userId,
                     amount: amount,
-                    currency: 'USD', // Or INR based on Razorpay config
+                    currency: currency,
                     status: 'paid',
                     method: 'razorpay',
                     plan_id: planId,
@@ -95,7 +108,8 @@ exports.verifyPayment = async (req, res) => {
                     provider_order_id: razorpay_order_id,
                     metadata: {
                         plan: planId,
-                        order_id: razorpay_order_id
+                        order_id: razorpay_order_id,
+                        currency: currency
                     }
                 });
 
@@ -120,14 +134,16 @@ exports.verifyPayment = async (req, res) => {
             );
 
             // Send Payment Receipt Email
+            // Send Payment Receipt Email
             if (req.user && req.user.email) {
-                const planLimits = getPlanLimits(planId);
-                const amount = planLimits.amount;
+                // Use the amount we calculated earlier based on currency
+                // amount variable is already defined and set based on planLimits.price_inr or price_usd
 
                 await EmailService.sendPaymentSuccessEmail(
                     req.user.email,
                     planId,
-                    amount, // Amount is already in currency unit (e.g., 29), not paise
+                    amount, // This is the amount in the selected currency (e.g. 299 or 4)
+                    currency,
                     razorpay_payment_id,
                     new Date().toLocaleDateString(),
                     req.user.name || 'User'

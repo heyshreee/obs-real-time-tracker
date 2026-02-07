@@ -42,7 +42,8 @@ exports.createProject = async (req, res) => {
         if (allowedOrigins) {
             const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
             const usage = await usageService.calculateUsage(userId);
-            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+            const planLimits = usage.plan ? await usageService.getPlanLimits(usage.plan) : await usageService.getPlanLimits('free');
+            const allowedOriginsLimit = planLimits.allowedOriginsLimit;
 
             if (originsArray.length > allowedOriginsLimit) {
                 return res.status(403).json({
@@ -286,7 +287,8 @@ exports.updateProject = async (req, res) => {
         if (allowedOrigins !== undefined) {
             const originsArray = allowedOrigins.split(',').map(o => o.trim()).filter(o => o);
             const usage = await usageService.calculateUsage(userId);
-            const allowedOriginsLimit = usage.plan ? usageService.getPlanLimits(usage.plan).allowedOriginsLimit : 1;
+            const planLimits = usage.plan ? await usageService.getPlanLimits(usage.plan) : await usageService.getPlanLimits('free');
+            const allowedOriginsLimit = planLimits.allowedOriginsLimit;
 
             if (originsArray.length > allowedOriginsLimit) {
                 return res.status(403).json({

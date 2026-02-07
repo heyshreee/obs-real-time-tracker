@@ -1,62 +1,27 @@
 const supabase = require('../config/supabase');
 const NotificationService = require('./notification.service');
+const planService = require('./plan.service');
 
-const PLAN_LIMITS = {
-    free: {
-        monthlyViews: 1000,
-        storageLimit: 100 * 1024 * 1024, // 100MB (approx for 24h retention of low volume)
-        projectLimit: 1,
-        liveLogs: false,
-        refreshRate: 60, // seconds
-        emailIntegrity: false,
-        allowedOriginsLimit: 1,
-        share_report: 0,
-        retentionDays: 1,
-        amount: 0
-    },
-    basic: {
-        monthlyViews: 50000,
-        storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
-        projectLimit: 5,
-        liveLogs: false,
-        refreshRate: 10,
-        emailIntegrity: false,
-        allowedOriginsLimit: 3,
-        share_report: 5,
-        retentionDays: 7,
-        amount: 4 // $4 (approx ₹299)
-    },
-    pro: {
-        monthlyViews: 500000,
-        storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 15,
-        liveLogs: false, // 1 sec refresh is not true "live" websocket in this context, or is it? Request says "1 sec" vs "Real-time (WebSocket)". Keeping false but low refresh rate.
-        refreshRate: 1,
-        emailIntegrity: true,
-        allowedOriginsLimit: 10,
-        share_report: 20,
-        retentionDays: 30,
-        amount: 12 // $12 (approx ₹999)
-    },
-    business: {
-        monthlyViews: 5000000,
-        storageLimit: 50 * 1024 * 1024 * 1024, // 50GB
-        projectLimit: 100, // Unlimited* (capped for safety)
-        liveLogs: true,
-        refreshRate: 0, // Real-time
-        emailIntegrity: true,
-        allowedOriginsLimit: 100,
-        share_report: 100,
-        retentionDays: 90,
-        amount: 39 // $39 (approx ₹2,999)
-    }
+// Deprecated: Hardcoded limits are now fetched from DB via planService.
+// Kept for fallback initialization only.
+const DEFAULT_LIMITS = {
+    free: { monthlyViews: 1000, projectLimit: 1, allowedOriginsLimit: 1 },
+    basic: { monthlyViews: 50000, projectLimit: 5, allowedOriginsLimit: 3 },
+    pro: { monthlyViews: 500000, projectLimit: 15, allowedOriginsLimit: 10 },
+    business: { monthlyViews: 5000000, projectLimit: 100, allowedOriginsLimit: 100 }
 };
 
 /**
  * Get limits for a specific plan
+ * Now Async to fetch from DB
  */
-exports.getPlanLimits = (plan = 'free') => {
-    return PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+exports.getPlanLimits = async (plan = 'free') => {
+    try {
+        return await planService.getPlanLimits(plan);
+    } catch (error) {
+        console.error('Failed to fetch plan limits dynamically, using fallback', error);
+        return DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.free;
+    }
 };
 
 /**
@@ -73,7 +38,7 @@ exports.calculateUsage = async (userId) => {
         .single();
 
     const plan = user?.plan || 'free';
-    const limits = exports.getPlanLimits(plan);
+    const limits = await exports.getPlanLimits(plan);
 
     // 2. Calculate Views (Current Month)
     const { data: projects } = await supabase

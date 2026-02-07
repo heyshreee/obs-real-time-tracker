@@ -329,7 +329,7 @@ export default function Layout() {
                                 <div className="text-right hidden sm:block leading-tight">
                                     <div className="text-sm font-bold text-white">{user.email}</div>
                                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                                        {user.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+                                        {user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan'}
                                     </div>
                                 </div>
                                 <div className="relative group">

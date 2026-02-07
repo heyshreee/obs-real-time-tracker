@@ -1,7 +1,117 @@
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, HelpCircle, ArrowLeft } from 'lucide-react';
 
 export default function Pricing() {
+    const [loading, setLoading] = useState(true);
+    const [plans, setPlans] = useState([
+        {
+            id: 'free',
+            name: 'Free',
+            price_usd: 0,
+            price_inr: 0,
+            description: "For personal projects", color: "slate",
+            features: ['1 Project', '1 Allowed Origin', '1,000 events/mo', '60 sec refresh'],
+            max_projects: 1,
+            allowed_origins: 1,
+            monthly_events: 1000,
+            live_logs: false
+        },
+        {
+            id: 'basic',
+            name: 'Basic',
+            price_usd: 4,
+            price_inr: 299,
+            description: "For serious hobbyists", color: "blue",
+            features: ['5 Projects', '3 Allowed Origins', 'Live Device Stats', '50,000 events/mo', '10 sec refresh'],
+            max_projects: 5,
+            allowed_origins: 3,
+            monthly_events: 50000,
+            live_logs: false
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price_usd: 12,
+            price_inr: 999,
+            description: "For professional creators", color: "indigo",
+            features: ['15 Projects', '10 Allowed Origins', 'Live Activity Logs', '500,000 events/mo', '1 sec refresh'],
+            max_projects: 15,
+            allowed_origins: 10,
+            monthly_events: 500000,
+            live_logs: true
+        },
+        {
+            id: 'business',
+            name: 'Business',
+            price_usd: 39,
+            price_inr: 2999,
+            description: "For scaling teams", color: "purple",
+            features: ['Unlimited Projects', '100 Allowed Origins', '5,000,000 events/mo', 'Real-time / SLA', 'Team access'],
+            max_projects: 100,
+            allowed_origins: 100,
+            monthly_events: 5000000,
+            live_logs: true
+        }
+    ]);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                const res = await fetch(`${API_URL}/api/plans`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setPlans(data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching plans:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
+
+    // Helper to get plan attribute safely
+    const getPlanAttr = (id, attr, fallback) => {
+        const plan = plans.find(p => p.id === id);
+        if (!plan) return fallback;
+        if (attr === 'price') return plan.price_usd > 0 ? `$${plan.price_usd}` : 'Free';
+        if (attr === 'monthly_events') return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(plan.monthly_events);
+        if (attr === 'max_projects') return plan.max_projects === 100 ? 'Unlimited*' : plan.max_projects;
+        if (attr === 'allowed_origins') return plan.allowed_origins;
+        if (attr === 'retention_days') return `${plan.retention_days || 30} days`;
+        return plan[attr] || fallback;
+    }
+
+    const featureRows = [
+        { feature: "Projects", free: getPlanAttr('free', 'max_projects', '1'), basic: getPlanAttr('basic', 'max_projects', '5'), pro: getPlanAttr('pro', 'max_projects', '15'), business: getPlanAttr('business', 'max_projects', 'Unlimited*') },
+        { feature: "Allowed Origins", free: getPlanAttr('free', 'allowed_origins', '1'), basic: getPlanAttr('basic', 'allowed_origins', '3'), pro: getPlanAttr('pro', 'allowed_origins', '10'), business: getPlanAttr('business', 'allowed_origins', '100') },
+        { feature: "Events / month", free: getPlanAttr('free', 'monthly_events', '1,000'), basic: getPlanAttr('basic', 'monthly_events', '50,000'), pro: getPlanAttr('pro', 'monthly_events', '500,000'), business: getPlanAttr('business', 'monthly_events', '5,000,000') },
+        { feature: "Real-time analytics", free: "Basic", basic: "Yes", pro: "Advanced", business: "Advanced" },
+        { feature: "Dashboard refresh rate", free: "60 sec", basic: "10 sec", pro: "1 sec", business: "Real-time (WebSocket)" },
+        { feature: "OBS overlay", free: "Default only", basic: "Custom text & theme", pro: "Fully customizable", business: "Fully customizable" },
+        { feature: "Visitor geolocation", free: "—", basic: "—", pro: "Country-level", business: "Country-level" },
+        { feature: "Device & browser stats", free: "—", basic: "Live", pro: "Yes", business: "Yes" },
+        { feature: "Live Activity Logs", free: "—", basic: "—", pro: "Yes", business: "Yes" },
+        { feature: "Tracking URL + API key", free: "—", basic: "Yes", pro: "Yes", business: "Yes" },
+        { feature: "Team access / roles", free: "—", basic: "—", pro: "—", business: "Yes" },
+        { feature: "Private dashboards", free: "—", basic: "—", pro: "—", business: "Yes" },
+        { feature: "Custom domain tracking", free: "—", basic: "—", pro: "—", business: "Yes" },
+        { feature: "Data retention", free: getPlanAttr('free', 'retention_days', '1 day'), basic: getPlanAttr('basic', 'retention_days', '7 days'), pro: getPlanAttr('pro', 'retention_days', '30 days'), business: getPlanAttr('business', 'retention_days', '90 days') },
+        { feature: "Email support", free: "Community", basic: "Standard", pro: "Priority", business: "Dedicated" },
+    ];
+
+    const displayPlans = [
+        { id: 'free', name: "Free", price: getPlanAttr('free', 'price', 'Free'), color: "slate" },
+        { id: 'basic', name: "Basic", price: getPlanAttr('basic', 'price', '$4'), color: "blue" },
+        { id: 'pro', name: "Pro", price: getPlanAttr('pro', 'price', '$12'), color: "indigo" },
+        { id: 'business', name: "Business", price: getPlanAttr('business', 'price', '$39'), color: "purple" }
+    ];
+
     return (
         <div className="min-h-screen bg-[#0B0E14] text-white font-sans selection:bg-blue-500/30">
             {/* Header */}
@@ -101,44 +211,36 @@ export default function Pricing() {
                     {/* Feature Comparison Table */}
                     <div className="max-w-7xl mx-auto mb-32 overflow-x-auto">
                         <h2 className="text-3xl font-bold text-white mb-12 text-center">Compare Plans</h2>
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-white/10">
-                                    <th className="py-6 px-4 text-sm font-semibold text-slate-400">Feature</th>
-                                    <th className="py-6 px-4 text-sm font-bold text-white">Free</th>
-                                    <th className="py-6 px-4 text-sm font-bold text-blue-400">Basic</th>
-                                    <th className="py-6 px-4 text-sm font-bold text-blue-500 bg-blue-500/10 rounded-t-xl">Pro</th>
-                                    <th className="py-6 px-4 text-sm font-bold text-purple-400">Business</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {[
-                                    { feature: "Projects", free: "1", basic: "5", pro: "15", business: "Unlimited*" },
-                                    { feature: "Allowed Origins", free: "1", basic: "3", pro: "10", business: "100" },
-                                    { feature: "Events / month", free: "1,000", basic: "50,000", pro: "500,000", business: "5,000,000" },
-                                    { feature: "Real-time analytics", free: "Basic", basic: "Yes", pro: "Advanced", business: "Advanced" },
-                                    { feature: "Dashboard refresh rate", free: "60 sec", basic: "10 sec", pro: "1 sec", business: "Real-time (WebSocket)" },
-                                    { feature: "OBS overlay", free: "Default only", basic: "Custom text & theme", pro: "Fully customizable", business: "Fully customizable" },
-                                    { feature: "Visitor geolocation", free: "—", basic: "—", pro: "Country-level", business: "Country-level" },
-                                    { feature: "Device & browser stats", free: "—", basic: "—", pro: "Yes", business: "Yes" },
-                                    { feature: "Tracking URL + API key", free: "—", basic: "Yes", pro: "Yes", business: "Yes" },
-                                    { feature: "Team access / roles", free: "—", basic: "—", pro: "—", business: "Yes" },
-                                    { feature: "Private dashboards", free: "—", basic: "—", pro: "—", business: "Yes" },
-                                    { feature: "Custom domain tracking", free: "—", basic: "—", pro: "—", business: "Yes" },
-                                    { feature: "Data retention", free: "24 hours", basic: "7 days", pro: "30 days", business: "90 days" },
-                                    { feature: "Support", free: "Community", basic: "Email", pro: "Priority email", business: "Dedicated + SLA" },
-                                    { feature: "Upgrade friction", free: "High", basic: "Medium", pro: "Low", business: "Custom" }
-                                ].map((row, i) => (
-                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="py-4 px-4 text-sm text-slate-300 font-medium">{row.feature}</td>
-                                        <td className="py-4 px-4 text-sm text-slate-400">{row.free}</td>
-                                        <td className="py-4 px-4 text-sm text-slate-400">{row.basic}</td>
-                                        <td className="py-4 px-4 text-sm text-white bg-blue-500/5 font-medium">{row.pro}</td>
-                                        <td className="py-4 px-4 text-sm text-slate-400">{row.business}</td>
+                        {loading ? (
+                            <div className="flex justify-center py-10">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                            </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="py-6 px-4 text-sm font-semibold text-slate-400">Feature</th>
+                                        {displayPlans.map((plan) => (
+                                            <th key={plan.id} className={`py-6 px-4 text-left`}>
+                                                <div className="text-xl font-bold text-white mb-1">{plan.name}</div>
+                                                <div className={`text-sm text-${plan.color}-400`}>{plan.price}</div>
+                                            </th>
+                                        ))}
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {featureRows.map((row, index) => (
+                                        <tr key={index} className="hover:bg-white/[0.02] transition-colors">
+                                            <td className="py-4 px-4 text-sm font-medium text-slate-300">{row.feature}</td>
+                                            <td className="py-4 px-4 text-sm text-slate-400">{row.free}</td>
+                                            <td className="py-4 px-4 text-sm text-slate-400">{row.basic}</td>
+                                            <td className="py-4 px-4 text-sm text-white font-medium">{row.pro}</td>
+                                            <td className="py-4 px-4 text-sm text-white font-medium">{row.business}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
 
                     {/* FAQ */}
