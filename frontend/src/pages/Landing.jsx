@@ -157,11 +157,13 @@ export default function Landing() {
                 <section className="py-12 border-y border-white/5 bg-white/[0.02]">
                     <div className="max-w-7xl mx-auto px-4 text-center">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-8">Integrated with your favorite platforms</p>
-                        <div className="flex justify-center items-center gap-16 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
-                            <div className="flex items-center gap-2 text-xl font-bold text-white"><span className="text-[#9146FF]">Twitch</span></div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white"><span className="text-[#FF0000]">YouTube</span> Live</div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white">OBS Studio</div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white">Streamlabs</div>
+                        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                            <div className="text-xl font-bold text-white tracking-tight">Razorpay</div>
+                            <div className="text-xl font-bold text-[#3ECF8E] tracking-tight">Supabase</div>
+                            <div className="text-xl font-bold text-[#F9AB00] tracking-tight">Google Analytics</div>
+                            <div className="text-xl font-bold text-[#F38020] tracking-tight">Cloudflare</div>
+                            <div className="text-xl font-bold text-[#FF9900] tracking-tight">AWS</div>
+                            <div className="text-xl font-bold text-white tracking-tight">Vercel</div>
                         </div>
                     </div>
                 </section>
