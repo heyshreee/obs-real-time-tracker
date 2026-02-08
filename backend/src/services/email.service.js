@@ -100,8 +100,9 @@ class EmailService {
     /**
      * Send payment success receipt
      */
-    static async sendPaymentSuccessEmail(email, plan, amount, transactionId, date, name = 'User') {
+    static async sendPaymentSuccessEmail(email, plan, amount, currency, transactionId, date, name = 'User') {
         try {
+            const currencySymbol = currency === 'INR' ? '₹' : '$';
             const html = EmailService.getBaseTemplate(`
                 <h2 style="color: #111827; margin-bottom: 20px;">Payment Successful: Receipt for Transaction ${transactionId}</h2>
                 <p>Dear ${name},</p>
@@ -112,7 +113,7 @@ class EmailService {
                     <h3 style="margin-top: 0; color: #374151;">Transaction Details:</h3>
                     <ul style="list-style: none; padding: 0; margin: 0;">
                         <li style="padding: 5px 0;"><strong>Product/Service:</strong> ${plan}</li>
-                        <li style="padding: 5px 0;"><strong>Amount Paid:</strong> $${amount}</li>
+                        <li style="padding: 5px 0;"><strong>Amount Paid:</strong> ${currencySymbol}${amount}</li>
                         <li style="padding: 5px 0;"><strong>Transaction ID:</strong> ${transactionId}</li>
                         <li style="padding: 5px 0;"><strong>Date:</strong> ${date}</li>
                     </ul>

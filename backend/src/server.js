@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
 const visitorRoutes = require('./routes/visitor.routes');
+const planRoutes = require('./routes/plan.routes');
 // const analyticsRoutes = require('./routes/analytics.routes');
 // const paymentRoutes = require('./routes/payment.routes');
 const setupVisitorSocket = require('./socket/visitorSocket');
@@ -64,6 +65,7 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
+app.use('/api/plans', planRoutes);
 app.use('/api/v1', require('./routes/v1'));
 
 // Legacy routes (optional: keep for backward compatibility or remove)
@@ -74,7 +76,7 @@ app.use('/api/track', require('./routes/v1/track.routes'));
 setupVisitorSocket(io);
 
 app.get('/', (req, res) => {
-  res.send('OBS View Tracker API is running');
+  res.send('WebPluse Analytics API is running');
 });
 
 const PORT = process.env.PORT || 5000;

@@ -186,7 +186,7 @@ export default function Layout() {
                         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-blue-500/20">
                             <Activity className="h-5 w-5" />
                         </div>
-                        <span className="text-xl font-bold text-white tracking-tight">OBS Tracker</span>
+                        <span className="text-xl font-bold text-white tracking-tight">WebPluse Analytics</span>
                     </div>
 
 
@@ -313,7 +313,7 @@ export default function Layout() {
                                 <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
                                     <Activity className="h-5 w-5" />
                                 </div>
-                                <span className="text-xl font-bold text-white tracking-tight">OBS Tracker</span>
+                                <span className="text-xl font-bold text-white tracking-tight">WebPluse Analytics</span>
                             </Link>
                         )}
                     </div>
@@ -329,7 +329,7 @@ export default function Layout() {
                                 <div className="text-right hidden sm:block leading-tight">
                                     <div className="text-sm font-bold text-white">{user.email}</div>
                                     <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                                        {user.plan === 'pro' ? 'Pro Plan' : 'Free Plan'}
+                                        {user.plan ? `${user.plan.charAt(0).toUpperCase() + user.plan.slice(1)} Plan` : 'Free Plan'}
                                     </div>
                                 </div>
                                 <div className="relative group">

@@ -21,6 +21,57 @@ export default function Billing() {
         projectLimit: 5
     });
     const [paymentHistory, setPaymentHistory] = useState([]);
+    const [currency, setCurrency] = useState('INR');
+    const [plans, setPlans] = useState([
+        {
+            id: 'free',
+            name: 'Free',
+            price_usd: 0,
+            price_inr: 0,
+            description: 'Trying WebPulse',
+            features: ['1 Project', '1 Allowed Origin', '1,000 events/mo', '60 sec refresh'],
+            max_projects: 1,
+            allowed_origins: 1,
+            monthly_events: 1000,
+            live_logs: false
+        },
+        {
+            id: 'basic',
+            name: 'Basic',
+            price_usd: 4,
+            price_inr: 299,
+            description: 'Students & solo devs',
+            features: ['5 Projects', '3 Allowed Origins', 'Live Device Stats', '50,000 events/mo', '10 sec refresh'],
+            max_projects: 5,
+            allowed_origins: 3,
+            monthly_events: 50000,
+            live_logs: false
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price_usd: 12,
+            price_inr: 999,
+            description: 'Streamers & growing apps',
+            features: ['15 Projects', '10 Allowed Origins', 'Live Activity Logs', '500,000 events/mo', '1 sec refresh', 'Advanced Analytics'],
+            max_projects: 15,
+            allowed_origins: 10,
+            monthly_events: 500000,
+            live_logs: true
+        },
+        {
+            id: 'business',
+            name: 'Business',
+            price_usd: 39,
+            price_inr: 2999,
+            description: 'Teams & high traffic',
+            features: ['Unlimited Projects', '100 Allowed Origins', '5,000,000 events/mo', 'Real-time / SLA', 'Team access'],
+            max_projects: 100,
+            allowed_origins: 100,
+            monthly_events: 5000000,
+            live_logs: true
+        }
+    ]);
 
     useEffect(() => {
         const init = async () => {
@@ -28,7 +79,8 @@ export default function Billing() {
                 await Promise.all([
                     loadStats(),
                     loadUsage(),
-                    loadPaymentHistory()
+                    loadPaymentHistory(),
+                    loadPlans()
                 ]);
             } catch (error) {
                 console.error('Failed to load billing data:', error);
@@ -125,6 +177,12 @@ export default function Billing() {
         });
     };
 
+
+
+    // ... existing useEffect ...
+
+    // ... existing loadPaymentHistory ...
+
     const handleUpgrade = async (planId) => {
         setLoading(true);
         try {
@@ -138,16 +196,16 @@ export default function Billing() {
             // 1. Create Order
             const { order } = await apiRequest('/payment/order', {
                 method: 'POST',
-                body: JSON.stringify({ planId })
+                body: JSON.stringify({ planId, currency })
             });
 
             const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Enter the Key ID generated from the Dashboard
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency,
                 name: "OBS Tracker",
                 description: `Upgrade to ${planId} Plan`,
-                image: "https://example.com/your_logo", // You can add a logo here
+                image: "https://example.com/your_logo",
                 order_id: order.id,
                 handler: async function (response) {
                     try {
@@ -158,13 +216,14 @@ export default function Billing() {
                                 razorpay_order_id: response.razorpay_order_id,
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_signature: response.razorpay_signature,
-                                planId
+                                planId,
+                                currency // Pass currency to verify endpoint
                             })
                         });
 
                         showToast(`Successfully upgraded to ${planId} plan!`, 'success');
-                        loadUsage(); // Reload usage to reflect new limits
-                        if (loadUser) loadUser(); // Reload user to reflect new plan
+                        loadUsage();
+                        if (loadUser) loadUser();
                     } catch (error) {
                         showToast('Payment verification failed', 'error');
                         console.error(error);
@@ -240,6 +299,22 @@ export default function Billing() {
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-2xl font-bold text-white">Billing & Subscription</h1>
                 <div className="flex items-center gap-4">
+                    {/* Currency Switcher */}
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-1 rounded-xl flex items-center">
+                        <button
+                            onClick={() => setCurrency('INR')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currency === 'INR' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            INR (₹)
+                        </button>
+                        <button
+                            onClick={() => setCurrency('USD')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currency === 'USD' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            USD ($)
+                        </button>
+                    </div>
+
                     <button className="p-2 text-slate-400 hover:text-white transition-colors">
                         <Clock className="h-5 w-5" />
                     </button>
@@ -332,207 +407,124 @@ export default function Billing() {
                 <h2 className="text-2xl font-bold text-white mb-2">Choose your plan</h2>
                 <p className="text-slate-400 text-sm mb-10">Pick the best plan that fits your growth needs.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* Free Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Free</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Perfect for side projects and small experiments.</p>
-                        </div>
-
-                        <div className="mb-10">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-white">$0</span>
-                                <span className="text-slate-500 font-medium">/month</span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">{(usageStats?.monthlyViews || 1000).toLocaleString()} Views / mo</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">{usageStats?.projectLimit || 5} Active Projects</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-slate-500">
-                                <div className="w-5 h-5 rounded-full bg-slate-800/50 flex items-center justify-center flex-shrink-0">
-                                    <X className="h-3 w-3" />
-                                </div>
-                                <span>Priority Support</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleDowngrade}
-                            disabled={usageStats.plan === 'free' || loading}
-                            className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 disabled:bg-slate-800/30 disabled:text-slate-500 disabled:cursor-default"
-                        >
-                            {usageStats.plan === 'free' ? 'Active Plan' : 'Downgrade to Free'}
-                        </button>
+                {loading ? (
+                    <div className="flex justify-center py-20">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                     </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {plans.map((plan) => {
+                            const isCurrentPlan = usageStats.plan === plan.id;
+                            const isFree = plan.id === 'free';
+                            const isPro = plan.id === 'pro';
+                            const isBusiness = plan.id === 'business';
+                            const isBasic = plan.id === 'basic';
 
-                    {/* Pro Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border-2 border-blue-600/50 rounded-3xl p-8 flex flex-col h-full relative shadow-[0_0_40px_rgba(37,99,235,0.1)] group">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                            <span className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg shadow-blue-600/20">Recommended</span>
-                        </div>
+                            // Determine price to display/compare based on currency
+                            const price = currency === 'USD' ? plan.price_usd : plan.price_inr;
+                            const currentPlanPrice = (plans.find(p => p.id === usageStats.plan) || {})[currency === 'USD' ? 'price_usd' : 'price_inr'] || 0;
+                            const priceDisplay = currency === 'USD' ? `$${price}` : `₹${price}`;
 
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Scale your monitoring with unlimited power.</p>
-                        </div>
+                            return (
+                                <div key={plan.id} className={`
+                                    backdrop-blur-xl border rounded-3xl p-6 flex flex-col h-full transition-all group relative
+                                    ${isCurrentPlan
+                                        ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.1)]'
+                                        : isPro
+                                            ? 'bg-gradient-to-b from-blue-900/20 to-slate-900/40 border-blue-500/30 hover:border-blue-500/50'
+                                            : 'bg-slate-900/40 border-slate-800/50 hover:border-slate-700/50'}
+                                `}>
+                                    {isPro && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                            <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg shadow-blue-600/20">Popular</span>
+                                        </div>
+                                    )}
 
-                        <div className="mb-10">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-bold text-white">$29</span>
-                                <span className="text-slate-500 font-medium">/month</span>
-                            </div>
-                        </div>
+                                    <div className="mb-6">
+                                        <h3 className={`text-lg font-bold mb-1 ${isFree ? 'text-white' :
+                                            isBasic ? 'text-blue-400' :
+                                                isPro ? 'text-white' : // Changed from blue-300 to white for Pro
+                                                    'text-purple-400'
+                                            }`}>{plan.name}</h3>
+                                        <p className="text-xs text-slate-400">
+                                            {plan.description}
+                                        </p>
+                                    </div>
 
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
+                                    <div className="mb-6">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-3xl font-bold text-white">
+                                                {priceDisplay}
+                                            </span>
+                                            <span className="text-slate-500 font-medium text-xs">/mo</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 mb-8 flex-1">
+                                        <ul className="space-y-3">
+                                            {plan.features && plan.features.length > 0 ? (
+                                                plan.features.map((feature, idx) => (
+                                                    <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isFree || isBasic ? 'text-blue-500' :
+                                                            isPro ? 'text-green-500' : // Changed from blue-400 to green-500 for Pro
+                                                                'text-purple-500'
+                                                            }`} />
+                                                        {feature.text || feature}
+                                                    </li>
+                                                ))
+                                            ) : (
+                                                <>
+                                                    <li className="flex items-center gap-2 text-xs text-slate-300">
+                                                        <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> {plan.max_projects === 100 ? 'Unlimited' : plan.max_projects} Projects
+                                                    </li>
+                                                    <li className="flex items-center gap-2 text-xs text-slate-300">
+                                                        <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> {plan.allowed_origins} Allowed Origin{plan.allowed_origins > 1 ? 's' : ''}
+                                                    </li>
+                                                    <li className="flex items-center gap-2 text-xs text-slate-300">
+                                                        <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> {new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(plan.monthly_events)} events/mo
+                                                    </li>
+                                                    {plan.live_logs && (
+                                                        <li className="flex items-center gap-2 text-xs text-slate-300">
+                                                            <Check className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Live Activity Logs
+                                                        </li>
+                                                    )}
+                                                </>
+                                            )}
+                                        </ul>
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            if (isCurrentPlan) return;
+                                            if (isFree) handleDowngrade();
+                                            else if (plan.id === 'business') { /* Do nothing or handle contact sales */ }
+                                            else handleUpgrade(plan.id); // Pass plan.id to handleUpgrade
+                                        }}
+                                        disabled={isCurrentPlan || (isFree && usageStats.plan === 'free') || (plan.id === 'business')} // Disable business button
+                                        className={`
+                                            w-full py-3 rounded-xl font-bold text-sm transition-all
+                                            ${isCurrentPlan
+                                                ? 'bg-blue-500/20 text-blue-400 cursor-default border border-blue-500/50'
+                                                : isFree
+                                                    ? 'border border-slate-800 text-slate-400 hover:bg-slate-800/50'
+                                                    : isBusiness
+                                                        ? 'border border-slate-800 text-slate-400 hover:bg-slate-800/50 active:scale-[0.98]' // Style for Contact Sales
+                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-900/20 active:scale-[0.98]'}
+                                            disabled:opacity-50 disabled:cursor-not-allowed
+                                        `}
+                                    >
+                                        {isCurrentPlan ? 'Active Plan' :
+                                            isFree ? 'Downgrade' :
+                                                isBusiness ? 'Contact Sales' : // Text for Business plan
+                                                    currentPlanPrice < price ? 'Upgrade' : 'Switch'}
+                                    </button>
                                 </div>
-                                <span className="text-slate-300">Unlimited Views</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Unlimited Projects</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Priority Email Support</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Custom Domain Tracking</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => handleUpgrade('pro', 29)}
-                            disabled={usageStats.plan === 'pro' || loading}
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
-                        >
-                            {usageStats.plan === 'pro' ? 'Active Plan' : 'Upgrade to Pro'}
-                        </button>
+                            );
+                        })}
                     </div>
+                )}
 
-                    {/* Enterprise Plan */}
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl p-8 flex flex-col h-full hover:border-slate-700/50 transition-colors group">
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed">Custom features and dedicated infrastructure.</p>
-                        </div>
-
-                        <div className="mb-10">
-                            <h3 className="text-4xl font-bold text-white">Custom</h3>
-                        </div>
-
-                        <div className="space-y-4 mb-10 flex-1">
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">White-label Reports</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">API Access</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm">
-                                <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <Check className="h-3 w-3 text-green-500" />
-                                </div>
-                                <span className="text-slate-300">Dedicated Manager</span>
-                            </div>
-                        </div>
-
-                        <button className="w-full py-4 rounded-2xl font-bold transition-all border border-slate-800 text-slate-400 hover:bg-slate-800/50 active:scale-[0.98]">
-                            Contact Sales
-                        </button>
-                    </div>
-                </div>
             </div>
-
-            {/* Payment History Section */}
-            <div className="mb-12">
-                <h2 className="text-2xl font-bold text-white mb-2">Payment History</h2>
-                <p className="text-slate-400 text-sm mb-8">Download your previous invoices and receipts.</p>
-
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-3xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-800/50 bg-slate-950/30">
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Invoice ID</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Amount</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                                    <th className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/30">
-                                {paymentHistory.length === 0 ? (
-                                    <tr className="group hover:bg-slate-800/10 transition-colors">
-                                        <td colSpan="5" className="px-8 py-6 text-sm text-slate-400 text-center">
-                                            No payment history found
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paymentHistory.map((payment) => (
-                                        <tr key={payment.id} className="group hover:bg-slate-800/10 transition-colors">
-                                            <td className="px-8 py-6 text-sm font-medium text-slate-300">{payment.id}</td>
-                                            <td className="px-8 py-6 text-sm text-slate-400">
-                                                {new Date(payment.date).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-8 py-6 text-sm font-bold text-white">${payment.amount}</td>
-                                            <td className="px-8 py-6">
-                                                <span className="px-2.5 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-bold rounded-full uppercase tracking-wider border border-green-500/20">
-                                                    {payment.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleEmailReceipt(payment.id)}
-                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                                                        title="Email Receipt"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDownloadReceipt(payment.id)}
-                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-                                                        title="Download Receipt"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div >
+        </div>
     );
 }

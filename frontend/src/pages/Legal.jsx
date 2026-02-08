@@ -8,11 +8,11 @@ export default function Legal({ type }) {
             lastUpdated: "January 14, 2026",
             body: (
                 <>
-                    <p>At OBS Tracker, we take your privacy seriously. This Privacy Policy explains how we collect, use, and protect your personal information.</p>
+                    <p>At WebPluse Analytics, we take your privacy seriously. This Privacy Policy explains how we collect, use, and protect your personal information.</p>
                     <h3>1. Information We Collect</h3>
                     <p>We collect information you provide directly to us, such as when you create an account, subscribe to our newsletter, or contact customer support.</p>
                     <h3>2. How We Use Your Information</h3>
-                    <p>We use the information we collect to provide, maintain, and improve our services, to develop new ones, and to protect OBS Tracker and our users.</p>
+                    <p>We use the information we collect to provide, maintain, and improve our services, to develop new ones, and to protect WebPluse Analytics and our users.</p>
                 </>
             )
         },
@@ -21,7 +21,7 @@ export default function Legal({ type }) {
             lastUpdated: "January 14, 2026",
             body: (
                 <>
-                    <p>By accessing or using OBS Tracker, you agree to be bound by these Terms of Service.</p>
+                    <p>By accessing or using WebPluse Analytics, you agree to be bound by these Terms of Service.</p>
                     <h3>1. Use of Service</h3>
                     <p>You must follow any policies made available to you within the Services. You may not misuse our Services.</p>
                     <h3>2. Account Responsibilities</h3>
@@ -36,7 +36,7 @@ export default function Legal({ type }) {
             lastUpdated: "January 14, 2026",
             body: (
                 <>
-                    <p>OBS Tracker uses cookies to improve your experience on our website.</p>
+                    <p>WebPluse Analytics uses cookies to improve your experience on our website.</p>
                     <h3>1. What are cookies?</h3>
                     <p>Cookies are small text files that are placed on your computer by websites that you visit.</p>
                     <h3>2. How we use cookies</h3>
@@ -74,7 +74,7 @@ export default function Legal({ type }) {
             </main>
 
             <footer className="border-t border-white/5 py-12 bg-[#0B0E14] text-center">
-                <p className="text-slate-600 text-sm">© 2026 OBS Tracker Inc. All rights reserved.</p>
+                <p className="text-slate-600 text-sm">© 2026 WebPluse Analytics Inc. All rights reserved.</p>
             </footer>
         </div>
     );

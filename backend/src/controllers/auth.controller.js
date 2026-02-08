@@ -144,7 +144,8 @@ exports.login = async (req, res) => {
                 email: user.email,
                 name: user.name,
                 plan: user.plan,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                next_billing_date: user.next_billing_date
             }
         });
     } catch (error) {
@@ -231,7 +232,8 @@ exports.verifyEmail = async (req, res) => {
                 email: user.email,
                 name: user.name,
                 plan: user.plan,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                next_billing_date: user.next_billing_date
             }
         });
 
@@ -446,7 +448,8 @@ exports.googleLogin = async (req, res) => {
                 email: user.email,
                 name: user.name,
                 plan: user.plan,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                next_billing_date: user.next_billing_date
             }
         });
 

@@ -1,44 +1,27 @@
 const supabase = require('../config/supabase');
 const NotificationService = require('./notification.service');
+const planService = require('./plan.service');
 
-const PLAN_LIMITS = {
-    free: {
-        monthlyViews: 1000,
-        storageLimit: 1 * 1024 * 1024 * 1024, // 1GB
-        projectLimit: 5,
-        liveLogs: false,
-        emailIntegrity: false,
-        allowedOriginsLimit: 1,
-        share_report: 5,
-        amount: 0
-    },
-    pro: {
-        monthlyViews: 100000,
-        storageLimit: 10 * 1024 * 1024 * 1024, // 10GB
-        projectLimit: 10,
-        liveLogs: true,
-        emailIntegrity: true,
-        allowedOriginsLimit: 10,
-        share_report: 100,
-        amount: 29
-    },
-    enterprise: {
-        monthlyViews: 1000000000, // Effectively unlimited
-        storageLimit: 100 * 1024 * 1024 * 1024, // 100GB
-        projectLimit: 100,
-        liveLogs: true,
-        emailIntegrity: true,
-        allowedOriginsLimit: 999,
-        share_report: Infinity,
-        amount: 'custom'
-    }
+// Deprecated: Hardcoded limits are now fetched from DB via planService.
+// Kept for fallback initialization only.
+const DEFAULT_LIMITS = {
+    free: { monthlyViews: 1000, projectLimit: 1, allowedOriginsLimit: 1 },
+    basic: { monthlyViews: 50000, projectLimit: 5, allowedOriginsLimit: 3 },
+    pro: { monthlyViews: 500000, projectLimit: 15, allowedOriginsLimit: 10 },
+    business: { monthlyViews: 5000000, projectLimit: 100, allowedOriginsLimit: 100 }
 };
 
 /**
  * Get limits for a specific plan
+ * Now Async to fetch from DB
  */
-exports.getPlanLimits = (plan = 'free') => {
-    return PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+exports.getPlanLimits = async (plan = 'free') => {
+    try {
+        return await planService.getPlanLimits(plan);
+    } catch (error) {
+        console.error('Failed to fetch plan limits dynamically, using fallback', error);
+        return DEFAULT_LIMITS[plan] || DEFAULT_LIMITS.free;
+    }
 };
 
 /**
@@ -55,7 +38,7 @@ exports.calculateUsage = async (userId) => {
         .single();
 
     const plan = user?.plan || 'free';
-    const limits = exports.getPlanLimits(plan);
+    const limits = await exports.getPlanLimits(plan);
 
     // 2. Calculate Views (Current Month)
     const { data: projects } = await supabase

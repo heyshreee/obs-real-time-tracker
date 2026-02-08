@@ -1,24 +1,91 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    BarChart2,
-    Shield,
-    Zap,
-    Check,
-    Play,
-    Layout,
-    Bell,
-    Star,
-    Users,
     Activity,
+    Zap,
+    Shield,
+    Globe,
+    BarChart3,
     Clock,
+    Check,
     Menu,
-    X
+    X,
+    ChevronRight,
+    Users,
+    Layers,
+    Lock
 } from 'lucide-react';
 
 export default function Landing() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [plans, setPlans] = useState([
+        {
+            id: 'free',
+            name: 'Free',
+            price_usd: 0,
+            price_inr: 0,
+            features: ['1 Project', '1 Allowed Origin', '1,000 events/mo', '60 sec refresh', 'Basic Analytics'],
+            max_projects: 1,
+            allowed_origins: 1,
+            monthly_events: 1000,
+            live_logs: false
+        },
+        {
+            id: 'basic',
+            name: 'Basic',
+            price_usd: 4,
+            price_inr: 299,
+            features: ['5 Projects', '3 Allowed Origins', 'Live Device Stats', '50,000 events/mo', '10 sec refresh', 'Real-time Analytics'],
+            max_projects: 5,
+            allowed_origins: 3,
+            monthly_events: 50000,
+            live_logs: false
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price_usd: 12,
+            price_inr: 999,
+            features: ['15 Projects', '10 Allowed Origins', 'Live Activity Logs', '500,000 events/mo', '1 sec refresh', 'Advanced Analytics', 'Priority Support'],
+            max_projects: 15,
+            allowed_origins: 10,
+            monthly_events: 500000,
+            live_logs: true
+        },
+        {
+            id: 'business',
+            name: 'Business',
+            price_usd: 39,
+            price_inr: 2999,
+            features: ['Unlimited Projects', '100 Allowed Origins', '5,000,000 events/mo', 'Real-time / SLA', 'Team access'],
+            max_projects: 100,
+            allowed_origins: 100,
+            monthly_events: 5000000,
+            live_logs: true
+        }
+    ]);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                const res = await fetch(`${API_URL}/api/plans`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setPlans(data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching plans:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#0B0E14] text-white selection:bg-blue-500/30 font-sans">
@@ -30,7 +97,7 @@ export default function Landing() {
                             <BarChart2 className="h-5 w-5 text-white" />
                         </div>
                         <span className="text-xl font-bold text-white">
-                            OBS Tracker
+                            WebPluse Analytics
                         </span>
                     </div>
 
@@ -88,7 +155,7 @@ export default function Landing() {
                 {/* Hero Section */}
                 <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-20">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/20 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-wide uppercase mb-8">
-                        OBS TRACKER SOLUTIONS
+                        WEBPLUSE ANALYTICS SOLUTIONS
                     </div>
 
                     <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
@@ -127,7 +194,7 @@ export default function Landing() {
                                     <div className="w-3 h-3 rounded-full bg-yellow-500/20"></div>
                                     <div className="w-3 h-3 rounded-full bg-green-500/20"></div>
                                 </div>
-                                <div className="ml-4 text-xs text-slate-500 font-mono">OBS Tracker Dashboard</div>
+                                <div className="ml-4 text-xs text-slate-500 font-mono">WebPluse Analytics Dashboard</div>
                             </div>
                             {/* Fake UI Content */}
                             <div className="p-6 grid grid-cols-4 gap-6 h-full">
@@ -157,11 +224,13 @@ export default function Landing() {
                 <section className="py-12 border-y border-white/5 bg-white/[0.02]">
                     <div className="max-w-7xl mx-auto px-4 text-center">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-8">Integrated with your favorite platforms</p>
-                        <div className="flex justify-center items-center gap-16 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
-                            <div className="flex items-center gap-2 text-xl font-bold text-white"><span className="text-[#9146FF]">Twitch</span></div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white"><span className="text-[#FF0000]">YouTube</span> Live</div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white">OBS Studio</div>
-                            <div className="flex items-center gap-2 text-xl font-bold text-white">Streamlabs</div>
+                        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                            <div className="text-xl font-bold text-white tracking-tight">Razorpay</div>
+                            <div className="text-xl font-bold text-[#3ECF8E] tracking-tight">Supabase</div>
+                            <div className="text-xl font-bold text-[#F9AB00] tracking-tight">Google Analytics</div>
+                            <div className="text-xl font-bold text-[#F38020] tracking-tight">Cloudflare</div>
+                            <div className="text-xl font-bold text-[#FF9900] tracking-tight">AWS</div>
+                            <div className="text-xl font-bold text-white tracking-tight">Vercel</div>
                         </div>
                     </div>
                 </section>
@@ -173,44 +242,90 @@ export default function Landing() {
                         <p className="text-slate-400 max-w-2xl mx-auto">Everything you need to take your content to the next level.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid lg:grid-cols-3 gap-8 mb-24">
                         {[
                             {
                                 icon: <Activity className="h-6 w-6 text-blue-400" />,
                                 color: "bg-blue-500/10",
                                 title: "Real-time Activity Logs",
-                                desc: "Monitor every visitor action as it happens. Watch your traffic grow live with instant updates."
+                                desc: "Track every visitor action as it happens — not minutes later. WebPulse captures live events such as page visits, session starts, and engagement activity in real time using WebSockets. This allows you to react instantly to audience behavior instead of guessing based on outdated data.",
+                                get: ["Live visitor activity feed", "Real-time page and session tracking", "Instant data updates without refresh", "Low-latency event delivery"],
+                                why: ["Perfect for live streams and launches", "Immediate insight into traffic spikes", "No waiting for analytics reports"]
                             },
                             {
                                 icon: <Layout className="h-6 w-6 text-purple-400" />,
                                 color: "bg-purple-500/10",
                                 title: "Multi-Project Management",
-                                desc: "Manage multiple channels or shows from a single dashboard. Switch contexts instantly without losing data."
+                                desc: "Manage multiple websites, streams, or applications from one centralized dashboard. Each project is fully isolated with its own tracking ID and data stream. You can switch between projects instantly without losing context or data.",
+                                get: ["Multiple project support", "Dedicated tracking IDs per project", "Fast project switching", "Secure data separation"],
+                                why: ["Ideal for agencies, creators, and dev teams", "One account, many projects", "Clean organization without complexity"]
                             },
                             {
                                 icon: <Bell className="h-6 w-6 text-teal-400" />,
                                 color: "bg-teal-500/10",
                                 title: "Instant Usage Alerts",
-                                desc: "Get notified immediately when you hit viewer milestones or if stream performance degrades."
+                                desc: "Stay informed the moment something changes. WebPulse monitors usage patterns and notifies you immediately when predefined thresholds are reached — whether that’s a surge in viewers or a sudden performance drop.",
+                                get: ["Real-time usage notifications", "Viewer milestone alerts", "Performance degradation alerts", "Custom alert thresholds"],
+                                why: ["React before problems escalate", "Never miss peak engagement moments", "Better stream and site reliability"]
                             }
                         ].map((feature, i) => (
-                            <div key={i} className="p-8 rounded-3xl bg-[#151921] border border-white/5 hover:border-white/10 transition-colors group">
+                            <div key={i} className="p-8 rounded-3xl bg-[#151921] border border-white/5 hover:border-white/10 transition-colors group flex flex-col">
                                 <div className={`h-14 w-14 rounded-2xl ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                                     {feature.icon}
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-                                <p className="text-slate-400 leading-relaxed text-sm">{feature.desc}</p>
+                                <p className="text-slate-400 leading-relaxed text-sm mb-8">{feature.desc}</p>
 
-                                <ul className="mt-6 space-y-2">
-                                    <li className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div> Instant setup
-                                    </li>
-                                    <li className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div> No hardware required
-                                    </li>
-                                </ul>
+                                <div className="space-y-6 mt-auto">
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">What you get</h4>
+                                        <ul className="space-y-2">
+                                            {feature.get.map((item, j) => (
+                                                <li key={j} className="flex items-start gap-2 text-xs text-slate-400 font-medium">
+                                                    <Check className="h-3.5 w-3.5 text-blue-500 mt-0.5" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Why it matters</h4>
+                                        <ul className="space-y-2">
+                                            {feature.why.map((item, j) => (
+                                                <li key={j} className="flex items-start gap-2 text-xs text-slate-400 font-medium">
+                                                    <Star className="h-3.5 w-3.5 text-purple-500 mt-0.5" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Technical Highlights */}
+                    <div className="max-w-4xl mx-auto rounded-3xl bg-[#0B0E14] border border-white/10 p-8 md:p-12">
+                        <div className="text-center mb-10">
+                            <h3 className="text-2xl font-bold text-white mb-4">Technical Highlights</h3>
+                            <p className="text-slate-400">Built with performance and scalability in mind.</p>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-x-12 gap-y-4">
+                            {[
+                                "WebSocket-based real-time updates",
+                                "REST APIs for integration",
+                                "Lightweight tracking script",
+                                "Optimized for low CPU and memory usage",
+                                "Works with React, Node.js, Express, and MongoDB",
+                                "OBS overlay and dashboard friendly",
+                                "No hardware. No plugins. No complex configuration."
+                            ].map((tech, i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                                    <span className="text-slate-300 text-sm font-medium">{tech}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </section>
 
@@ -223,7 +338,7 @@ export default function Landing() {
                                     Trusted by over 5,000+ top-tier creators.
                                 </h2>
                                 <p className="text-slate-400 mb-8 leading-relaxed">
-                                    "OBS Tracker is the only analytics tool that gives me the granularity I need to understand my audience retention. It's completely changed how I plan my content schedule."
+                                    "WebPluse Analytics is the only analytics tool that gives me the granularity I need to understand my audience retention. It's completely changed how I plan my content schedule."
                                 </p>
                                 <div className="flex items-center gap-4">
                                     <div className="h-12 w-12 rounded-full bg-slate-800 border border-white/10"></div>
@@ -259,85 +374,108 @@ export default function Landing() {
                         <p className="text-slate-400">The perfect plan for every stage of your journey.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                        {/* STARTER */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">STARTER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$0</span>
-                                <span className="text-slate-500">/mo</span>
-                            </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 5 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Basic Analytics
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
-                                Get Started
-                            </Link>
+                    {loading ? (
+                        <div className="flex justify-center items-center py-20">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                         </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                            {plans.map((plan) => {
+                                const isPro = plan.id === 'pro';
+                                const isBusiness = plan.id === 'business';
+                                const isBasic = plan.id === 'basic';
+                                const isFree = plan.id === 'free';
 
-                        {/* PRO STREAMER */}
-                        <div className="p-8 rounded-3xl bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 flex flex-col relative transform md:-translate-y-4">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1 bg-blue-500 rounded-full text-xs font-bold text-white border border-blue-400">MOST POPULAR</div>
-                            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-2">PRO STREAMER</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">$29</span>
-                                <span className="text-blue-200">/mo</span>
-                            </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100,000 events/mo
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> 100 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> AI-Powered Insights
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Real-time Activity Logs
-                                </li>
-                                <li className="flex items-center gap-3 text-white text-sm">
-                                    <Check className="h-4 w-4 text-white" /> Email Notifications
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl bg-white text-blue-600 text-center font-bold hover:bg-blue-50 transition-colors">
-                                Start Free Trial
-                            </Link>
-                        </div>
+                                return (
+                                    <div key={plan.id} className={`p-6 rounded-3xl flex flex-col transition-all duration-300 relative ${isPro
+                                        ? 'bg-blue-600 border border-blue-500 shadow-2xl shadow-blue-900/20 transform lg:-translate-y-4'
+                                        : isBusiness
+                                            ? 'bg-gradient-to-b from-[#151921] to-blue-900/20 border border-blue-500/30 hover:border-blue-500/50'
+                                            : 'bg-[#151921] border border-white/5 hover:border-white/10'
+                                        }`}>
+                                        {isPro && (
+                                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-500 rounded-full text-[10px] font-bold text-white border border-blue-400 tracking-wide">MOST POPULAR</div>
+                                        )}
 
-                        {/* SCALE / ORG */}
-                        <div className="p-8 rounded-3xl bg-[#151921] border border-white/5 flex flex-col">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">SCALE / ORG</h3>
-                            <div className="flex items-baseline gap-1 mb-6">
-                                <span className="text-4xl font-bold text-white">Custom</span>
-                            </div>
-                            <ul className="space-y-4 mb-8 flex-1">
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom volume
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> 1,000 Projects
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Advanced AI Models
-                                </li>
-                                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                                    <Check className="h-4 w-4 text-green-500" /> Custom Email Reports
-                                </li>
-                            </ul>
-                            <Link to="/register" className="block w-full py-3 px-4 rounded-xl border border-white/10 text-white text-center font-medium hover:bg-white/5 transition-colors">
-                                Contact Sales
-                            </Link>
+                                        <h3 className={`text-sm font-bold uppercase tracking-wider mb-2 ${isPro ? 'text-blue-100' : isBasic || isBusiness ? 'text-blue-400' : 'text-slate-400'
+                                            }`}>{plan.name}</h3>
+
+                                        <div className="flex items-baseline gap-1 mb-1">
+                                            <span className={`text-3xl font-bold ${isPro ? 'text-white' : 'text-white'}`}>
+                                                {!plan.price_inr && !plan.price_usd ? 'Free' : `₹${plan.price_inr}`}
+                                            </span>
+                                            {(plan.price_inr > 0) && <span className={isPro ? 'text-blue-200' : 'text-slate-500'}>/mo</span>}
+                                        </div>
+
+                                        <div className={`text-xs mb-6 ${isPro ? 'text-blue-200' : 'text-slate-500'}`}>
+                                            {plan.price_usd > 0 ? `$${plan.price_usd} / month` : '$0 / month'}
+                                        </div>
+
+                                        <p className={`text-sm mb-6 min-h-[40px] ${isPro ? 'text-blue-100' : 'text-slate-400'}`}>
+                                            {plan.id === 'free' && 'Trying WebPulse'}
+                                            {plan.id === 'basic' && 'Students & solo devs'}
+                                            {plan.id === 'pro' && 'Streamers & growing apps'}
+                                            {plan.id === 'business' && 'Scale-ups & teams'}
+                                        </p>
+
+                                        <ul className="space-y-3 mb-8 flex-1">
+                                            {/* Feature list from plan features JSON if available, else usage limits */}
+                                            {plan.features && plan.features.length > 0 ? (
+                                                // If backend returns formatted features list (preferred for UI consistency)
+                                                // Assuming specific structure or defaulting to constructing it
+                                                plan.features.slice(0, 6).map((feature, idx) => ( // Show top 6 features
+                                                    <li key={idx} className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {feature.text || feature}
+                                                    </li>
+                                                ))
+                                            ) : (
+                                                // Fallback to constructing user-friendly list from limits if "features" array is empty/missing
+                                                <>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.max_projects === 100 ? 'Unlimited' : plan.max_projects} Projects
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.allowed_origins} Allowed Origin{plan.allowed_origins > 1 ? 's' : ''}
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(plan.monthly_events)} events/mo
+                                                    </li>
+                                                    <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                        <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                        {plan.refresh_rate === 0 ? 'Real-time' : `${plan.refresh_rate} sec`} dashboard refresh
+                                                    </li>
+                                                    {plan.live_logs && (
+                                                        <li className={`flex items-center gap-2 text-xs ${isPro ? 'text-white' : 'text-slate-300'}`}>
+                                                            <Check className={`h-3.5 w-3.5 shrink-0 ${isPro ? 'text-white' : 'text-blue-500'}`} />
+                                                            Live Activity Logs
+                                                        </li>
+                                                    )}
+                                                </>
+                                            )}
+                                        </ul>
+
+                                        <Link
+                                            to="/register"
+                                            className={`block w-full py-2.5 px-4 rounded-xl text-center text-sm font-medium transition-colors ${isPro
+                                                ? 'bg-white text-blue-600 hover:bg-blue-50'
+                                                : isBasic
+                                                    ? 'bg-blue-600/10 text-blue-400 border border-blue-500/50 hover:bg-blue-600/20'
+                                                    : isBusiness
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-900/20'
+                                                        : 'border border-white/10 text-white hover:bg-white/5'
+                                                }`}
+                                        >
+                                            {isFree ? 'Get Started' : `Choose ${plan.name}`}
+                                        </Link>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
+                    )}
                 </section>
 
                 {/* Stats */}
@@ -370,7 +508,7 @@ export default function Landing() {
                         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
                         <div className="relative z-10">
                             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Your growth starts with better data.</h2>
-                            <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join thousands of creators who are using OBS Tracker to build their audience.</p>
+                            <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join thousands of creators who are using WebPluse Analytics to build their audience.</p>
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                                 <Link
                                     to="/register"
@@ -398,7 +536,7 @@ export default function Landing() {
                                     <div className="bg-blue-600 p-1.5 rounded-lg">
                                         <BarChart2 className="h-5 w-5 text-white" />
                                     </div>
-                                    <span className="text-xl font-bold text-white">OBS Tracker</span>
+                                    <span className="text-xl font-bold text-white">WebPluse Analytics</span>
                                 </div>
                                 <p className="text-slate-500 text-sm leading-relaxed">
                                     The advanced analytics platform for modern content creators. Track, analyze, and grow.
@@ -432,7 +570,7 @@ export default function Landing() {
                             </div>
                         </div>
                         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <p className="text-slate-600 text-sm">© 2026 OBS Tracker Inc. All rights reserved.</p>
+                            <p className="text-slate-600 text-sm">© 2026 WebPluse Analytics Inc. All rights reserved.</p>
                             <div className="flex gap-6 text-slate-500">
                                 <a href="#" className="hover:text-white transition-colors">Twitter</a>
                                 <a href="#" className="hover:text-white transition-colors">GitHub</a>
