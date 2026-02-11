@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     User, Shield, Bell, BarChart2, Briefcase,
     Save, Loader, Upload, Trash2, Monitor, Smartphone, Globe,
-    Check, AlertTriangle, LogOut, Settings as SettingsIcon, Edit2, CreditCard, Download
+    Check, AlertTriangle, LogOut, Settings as SettingsIcon, Edit2, CreditCard, Download,
+    MessageSquare, Send, Lock
 } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -23,7 +24,8 @@ export default function Settings() {
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'usage', label: 'Usage & Quota', icon: BarChart2 },
         { id: 'projects', label: 'Projects & Teams', icon: Briefcase },
-        { id: 'billing', label: 'Billing & Invoices', icon: BarChart2 },
+        { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
+        { id: 'linked_accounts', label: 'Linked Accounts', icon: MessageSquare },
     ];
 
     return (
@@ -67,6 +69,7 @@ export default function Settings() {
                             {activeTab === 'usage' && <UsageSection user={user} />}
                             {activeTab === 'projects' && <ProjectsSection user={user} />}
                             {activeTab === 'billing' && <BillingSection user={user} />}
+                            {activeTab === 'linked_accounts' && <LinkedAccountsSection user={user} showToast={showToast} />}
                         </motion.div>
                     </AnimatePresence>
                 </div>
@@ -801,7 +804,7 @@ function BillingSection({ user }) {
                 }
             });
 
-            if (!response.ok) throw new Error('Download failed');
+            if (!response.ok) throw new Error('Failed to download receipt');
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -813,6 +816,7 @@ function BillingSection({ user }) {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (error) {
+            console.error('Download receipt error:', error);
             showToast('Failed to download receipt', 'error');
         }
     };
@@ -828,6 +832,8 @@ function BillingSection({ user }) {
             showToast('Failed to send receipt email', 'error');
         }
     };
+
+    if (loading) return <Spinner />;
 
     return (
         <div className="space-y-6">
@@ -935,6 +941,204 @@ function BillingSection({ user }) {
                         </tbody>
                     </table>
                 </div>
+            </div >
+        </div >
+    );
+}
+
+function LinkedAccountsSection({ user, showToast }) {
+    const [accounts, setAccounts] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [whatsappNumber, setWhatsappNumber] = useState('');
+    const [telegramChatId, setTelegramChatId] = useState('');
+    const [telegramUsername, setTelegramUsername] = useState('');
+    const [isPro, setIsPro] = useState(false);
+
+    // Get usage stats from context
+    const context = useOutletContext();
+    const usageStats = context?.usageStats;
+
+    useEffect(() => {
+        loadLinkedAccounts();
+        if (usageStats) {
+            const PLAN_LEVELS = { free: 0, basic: 1, pro: 2, business: 3 };
+            setIsPro((PLAN_LEVELS[usageStats.plan] || 0) >= 2);
+        }
+    }, [usageStats]);
+
+    const loadLinkedAccounts = async () => {
+        try {
+            const data = await apiRequest('/user/linked-accounts');
+            setAccounts(data);
+            if (data.whatsapp) setWhatsappNumber(data.whatsapp.number);
+            if (data.telegram) {
+                setTelegramChatId(data.telegram.chat_id);
+                setTelegramUsername(data.telegram.username);
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Failed to load linked accounts', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const linkWhatsApp = async (e) => {
+        e.preventDefault();
+        try {
+            await apiRequest('/user/linked-accounts/whatsapp', {
+                method: 'POST',
+                body: JSON.stringify({ number: whatsappNumber })
+            });
+            showToast('WhatsApp linked successfully', 'success');
+            loadLinkedAccounts();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    };
+
+    const linkTelegram = async (e) => {
+        e.preventDefault();
+        try {
+            await apiRequest('/user/linked-accounts/telegram', {
+                method: 'POST',
+                body: JSON.stringify({ chat_id: telegramChatId, username: telegramUsername })
+            });
+            showToast('Telegram linked successfully', 'success');
+            loadLinkedAccounts();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    };
+
+    const unlink = async (platform) => {
+        if (!confirm('Are you sure you want to unlink?')) return;
+        try {
+            await apiRequest(`/user/linked-accounts/${platform}`, { method: 'DELETE' });
+            showToast('Unlinked successfully', 'success');
+            setAccounts(prev => {
+                const newAcc = { ...prev };
+                delete newAcc[platform];
+                return newAcc;
+            });
+            if (platform === 'whatsapp') setWhatsappNumber('');
+            if (platform === 'telegram') { setTelegramChatId(''); setTelegramUsername(''); }
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    };
+
+    if (loading) return <Spinner />;
+
+    return (
+        <div className="space-y-6">
+            {/* WhatsApp Card */}
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
+                <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-green-500/10 rounded-xl">
+                            <Smartphone className="h-6 w-6 text-green-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">WhatsApp Integration</h3>
+                            <p className="text-sm text-slate-500">Receive notifications directly on WhatsApp.</p>
+                        </div>
+                    </div>
+                    {accounts.whatsapp && (
+                        <span className="px-3 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded-full border border-green-500/20">
+                            Linked
+                        </span>
+                    )}
+                </div>
+
+                {accounts.whatsapp ? (
+                    <div className="flex items-center justify-between p-4 bg-slate-950/50 border border-slate-800 rounded-xl">
+                        <div className="font-mono text-slate-300">{accounts.whatsapp.number}</div>
+                        <button onClick={() => unlink('whatsapp')} className="text-red-400 hover:text-red-300 text-sm font-medium">Unlink</button>
+                    </div>
+                ) : (
+                    <form onSubmit={linkWhatsApp} className="flex gap-4">
+                        <input
+                            type="text"
+                            placeholder="+1234567890"
+                            value={whatsappNumber}
+                            onChange={e => setWhatsappNumber(e.target.value)}
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                            required
+                        />
+                        <button type="submit" className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">
+                            Link
+                        </button>
+                    </form>
+                )}
+            </div>
+
+            {/* Telegram Card */}
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8 relative overflow-hidden">
+                {!isPro && (
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
+                        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-sm">
+                            <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Lock className="h-6 w-6 text-blue-400" />
+                            </div>
+                            <h4 className="text-lg font-bold text-white mb-2">Pro Feature</h4>
+                            <p className="text-slate-400 text-sm mb-4">Telegram integration is available on Pro plan and above.</p>
+                            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm">Upgrade to Pro</button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-xl">
+                            <Send className="h-6 w-6 text-blue-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">Telegram Integration</h3>
+                            <p className="text-sm text-slate-500">Receive notifications via Telegram Bot.</p>
+                        </div>
+                    </div>
+                    {accounts.telegram && (
+                        <span className="px-3 py-1 bg-blue-500/10 text-blue-500 text-xs font-bold rounded-full border border-blue-500/20">
+                            Linked
+                        </span>
+                    )}
+                </div>
+
+                {accounts.telegram ? (
+                    <div className="flex items-center justify-between p-4 bg-slate-950/50 border border-slate-800 rounded-xl">
+                        <div>
+                            <div className="font-bold text-white">{accounts.telegram.username}</div>
+                            <div className="text-xs text-slate-500 font-mono">ID: {accounts.telegram.chat_id}</div>
+                        </div>
+                        <button onClick={() => unlink('telegram')} className="text-red-400 hover:text-red-300 text-sm font-medium">Unlink</button>
+                    </div>
+                ) : (
+                    <form onSubmit={linkTelegram} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input
+                                type="text"
+                                placeholder="Chat ID"
+                                value={telegramChatId}
+                                onChange={e => setTelegramChatId(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                required
+                            />
+                            <input
+                                type="text"
+                                placeholder="Username (Optional)"
+                                value={telegramUsername}
+                                onChange={e => setTelegramUsername(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                        </div>
+                        <div className="flex justify-end">
+                            <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">
+                                Link Telegram
+                            </button>
+                        </div>
+                    </form>
+                )}
             </div>
         </div>
     );

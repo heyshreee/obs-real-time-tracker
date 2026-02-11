@@ -5,7 +5,7 @@ import {
     Zap,
     Shield,
     Globe,
-    BarChart3,
+    BarChart2,
     Clock,
     Check,
     Menu,
@@ -13,7 +13,11 @@ import {
     ChevronRight,
     Users,
     Layers,
-    Lock
+    Lock,
+    Play,
+    Layout,
+    Bell,
+    Star
 } from 'lucide-react';
 
 export default function Landing() {
@@ -70,8 +74,9 @@ export default function Landing() {
     useEffect(() => {
         const fetchPlans = async () => {
             try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-                const res = await fetch(`${API_URL}/api/plans`);
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                const baseUrl = API_URL.replace(/\/api\/?$/, '');
+                const res = await fetch(`${baseUrl}/api/plans`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
