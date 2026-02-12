@@ -261,7 +261,7 @@ export default function Projects() {
                     {filteredProjects.map((project) => (
                         <div
                             key={project.id}
-                            onClick={() => navigate(`/dashboard/projects/${encodeURIComponent(project.name)}`)}
+                            onClick={() => navigate(`/dashboard/projects/${project.id}`)}
                             className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-blue-500/30 transition-all group relative flex flex-col cursor-pointer"
                         >
                             <div className="flex justify-between items-start mb-4">
@@ -291,7 +291,7 @@ export default function Projects() {
                                     </div>
                                 </div>
                                 <Link
-                                    to={`/dashboard/projects/${encodeURIComponent(project.name)}`}
+                                    to={`/dashboard/projects/${project.id}`}
                                     onClick={(e) => e.stopPropagation()}
                                     className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-medium group/link"
                                 >
@@ -337,7 +337,7 @@ export default function Projects() {
                                 {filteredProjects.map((project) => (
                                     <tr
                                         key={project.id}
-                                        onClick={() => navigate(`/dashboard/projects/${encodeURIComponent(project.name)}`)}
+                                        onClick={() => navigate(`/dashboard/projects/${project.id}`)}
                                         className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -372,7 +372,7 @@ export default function Projects() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            navigate(`/dashboard/projects/${encodeURIComponent(project.name)}/settings`);
+                                                            navigate(`/dashboard/projects/${project.id}/settings`);
                                                         }}
                                                         className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                                                     >

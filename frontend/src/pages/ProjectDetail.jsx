@@ -469,7 +469,7 @@ export default function Tracker() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
                 <div className="flex items-center gap-3">
-                  <Link to={`/dashboard/projects/${encodeURIComponent(project?.name)}/activity`} target="_blank" className="text-xs text-blue-400 hover:text-blue-300 font-medium">View All</Link>
+                  <Link to={`/dashboard/projects/${project?.id}/activity`} target="_blank" className="text-xs text-blue-400 hover:text-blue-300 font-medium">View All</Link>
                   <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase">LIVE FEED</span>
                 </div>
               </div>
