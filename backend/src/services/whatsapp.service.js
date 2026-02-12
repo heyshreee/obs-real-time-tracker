@@ -10,14 +10,35 @@ class WhatsAppService {
      */
     static async send(to, message) {
         try {
-            // In a real implementation, this would call the WhatsApp Business API or a provider like Twilio
-            // For now, we'll just log it as we don't have credentials
-            console.log(`[WhatsApp] Sending message to ${to}: ${message}`);
-            
-            // Simulation of API call
-            return { success: true, messageId: `wa_${Date.now()}` };
+            // Check for Twilio Credentials
+            const accountSid = process.env.TWILIO_ACCOUNT_SID;
+            const authToken = process.env.TWILIO_AUTH_TOKEN;
+            const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+            if (accountSid && authToken && fromNumber) {
+                const client = require('twilio')(accountSid, authToken);
+
+                // Ensure 'to' number has whatsapp: prefix if not present
+                const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+                const fromFormatted = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
+
+                const response = await client.messages.create({
+                    body: message,
+                    from: fromFormatted,
+                    to: toFormatted
+                });
+
+                console.log(`[WhatsApp] Sent message to ${to}: ${response.sid}`);
+                return { success: true, messageId: response.sid };
+            } else {
+                // Fallback to Mock
+                console.log(`[WhatsApp] (Mock) Sending message to ${to}: ${message}`);
+                console.log('[WhatsApp] To enable real sending, set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_NUMBER in .env');
+                return { success: true, messageId: `mock_wa_${Date.now()}` };
+            }
         } catch (error) {
             console.error('[WhatsApp] Failed to send message:', error);
+            // Don't throw, just return failure so we don't crash main flow
             return { success: false, error: error.message };
         }
     }

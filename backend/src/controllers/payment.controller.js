@@ -4,6 +4,7 @@ const supabase = require('../config/supabase');
 const ActivityLogService = require('../services/activity.service');
 const { getPlanLimits } = require('../services/usage.service');
 const EmailService = require('../services/email.service');
+const NotificationService = require('../services/notification.service');
 const ReceiptService = require('../services/receipt.service');
 
 exports.createOrder = async (req, res) => {
@@ -149,6 +150,14 @@ exports.verifyPayment = async (req, res) => {
                     req.user.name || 'User'
                 );
             }
+
+            // Real-time Notification
+            NotificationService.create(
+                userId,
+                'Payment Successful',
+                `Your payment of ${req.body.currency || 'INR'} ${amount} for the ${planId} plan was successful. Thank you for your purchase!`,
+                'success'
+            ).catch(err => console.error('Failed to send payment notification:', err));
 
             res.json({ success: true, message: 'Payment verified and plan updated' });
         } else {
@@ -298,6 +307,14 @@ exports.downgradePlan = async (req, res) => {
                 req.user.name || 'User'
             ).catch(console.error);
         }
+
+        // Real-time Notification
+        NotificationService.create(
+            userId,
+            'Plan Downgraded',
+            'Your subscription has been downgraded to the Free plan. You may lose access to Pro features.',
+            'warning'
+        ).catch(err => console.error('Failed to send downgrade notification:', err));
 
         res.json({ success: true, message: 'Plan downgraded successfully' });
     } catch (error) {

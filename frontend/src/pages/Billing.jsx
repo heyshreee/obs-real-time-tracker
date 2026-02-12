@@ -79,8 +79,7 @@ export default function Billing() {
                 await Promise.all([
                     loadStats(),
                     loadUsage(),
-                    loadPaymentHistory(),
-                    loadPlans()
+                    loadPaymentHistory()
                 ]);
             } catch (error) {
                 console.error('Failed to load billing data:', error);
