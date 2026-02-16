@@ -949,7 +949,6 @@ function BillingSection({ user }) {
 function LinkedAccountsSection({ user, showToast }) {
     const [accounts, setAccounts] = useState({});
     const [loading, setLoading] = useState(true);
-    const [whatsappNumber, setWhatsappNumber] = useState('');
     const [telegramChatId, setTelegramChatId] = useState('');
     const [telegramUsername, setTelegramUsername] = useState('');
     const [isPro, setIsPro] = useState(false);
@@ -970,7 +969,6 @@ function LinkedAccountsSection({ user, showToast }) {
         try {
             const data = await apiRequest('/user/linked-accounts');
             setAccounts(data);
-            if (data.whatsapp) setWhatsappNumber(data.whatsapp.number);
             if (data.telegram) {
                 setTelegramChatId(data.telegram.chat_id);
                 setTelegramUsername(data.telegram.username);
@@ -980,20 +978,6 @@ function LinkedAccountsSection({ user, showToast }) {
             showToast('Failed to load linked accounts', 'error');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const linkWhatsApp = async (e) => {
-        e.preventDefault();
-        try {
-            await apiRequest('/user/linked-accounts/whatsapp', {
-                method: 'POST',
-                body: JSON.stringify({ number: whatsappNumber })
-            });
-            showToast('WhatsApp linked successfully', 'success');
-            loadLinkedAccounts();
-        } catch (err) {
-            showToast(err.message, 'error');
         }
     };
 
@@ -1021,7 +1005,6 @@ function LinkedAccountsSection({ user, showToast }) {
                 delete newAcc[platform];
                 return newAcc;
             });
-            if (platform === 'whatsapp') setWhatsappNumber('');
             if (platform === 'telegram') { setTelegramChatId(''); setTelegramUsername(''); }
         } catch (err) {
             showToast(err.message, 'error');
@@ -1032,47 +1015,6 @@ function LinkedAccountsSection({ user, showToast }) {
 
     return (
         <div className="space-y-6">
-            {/* WhatsApp Card */}
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8">
-                <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-green-500/10 rounded-xl">
-                            <Smartphone className="h-6 w-6 text-green-500" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-white">WhatsApp Integration</h3>
-                            <p className="text-sm text-slate-500">Receive notifications directly on WhatsApp.</p>
-                        </div>
-                    </div>
-                    {accounts.whatsapp && (
-                        <span className="px-3 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded-full border border-green-500/20">
-                            Linked
-                        </span>
-                    )}
-                </div>
-
-                {accounts.whatsapp ? (
-                    <div className="flex items-center justify-between p-4 bg-slate-950/50 border border-slate-800 rounded-xl">
-                        <div className="font-mono text-slate-300">{accounts.whatsapp.number}</div>
-                        <button onClick={() => unlink('whatsapp')} className="text-red-400 hover:text-red-300 text-sm font-medium">Unlink</button>
-                    </div>
-                ) : (
-                    <form onSubmit={linkWhatsApp} className="flex gap-4">
-                        <input
-                            type="text"
-                            placeholder="+1234567890"
-                            value={whatsappNumber}
-                            onChange={e => setWhatsappNumber(e.target.value)}
-                            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                            required
-                        />
-                        <button type="submit" className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">
-                            Link
-                        </button>
-                    </form>
-                )}
-            </div>
-
             {/* Telegram Card */}
             <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8 relative overflow-hidden">
                 {!isPro && (

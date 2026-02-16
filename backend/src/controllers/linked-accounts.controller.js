@@ -1,6 +1,5 @@
 const supabase = require('../config/supabase');
 const usageService = require('../services/usage.service');
-const WhatsAppService = require('../services/whatsapp.service');
 const TelegramService = require('../services/telegram.service');
 
 exports.getLinkedAccounts = async (req, res) => {
@@ -15,51 +14,6 @@ exports.getLinkedAccounts = async (req, res) => {
         res.json(data.linked_accounts || {});
     } catch (error) {
         console.error('Get linked accounts error:', error);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-exports.linkWhatsApp = async (req, res) => {
-    try {
-        const { number } = req.body;
-
-        if (!number) {
-            return res.status(400).json({ error: 'Phone number is required' });
-        }
-
-        // Fetch existing
-        const { data: user } = await supabase
-            .from('users')
-            .select('linked_accounts')
-            .eq('id', req.user.id)
-            .single();
-
-        const existing = user?.linked_accounts || {};
-
-        // Mock Verification: In real app, we would send a code first. 
-        // Here we just save it as verified for the prototype.
-        const newData = {
-            ...existing,
-            whatsapp: {
-                number,
-                verified: true,
-                linked_at: new Date().toISOString()
-            }
-        };
-
-        const { error } = await supabase
-            .from('users')
-            .update({ linked_accounts: newData })
-            .eq('id', req.user.id);
-
-        if (error) throw error;
-
-        // Send welcome message
-        await WhatsAppService.send(number, 'Welcome to OBS Tracker! Your WhatsApp account has been successfully linked.');
-
-        res.json({ success: true, linked_accounts: newData });
-    } catch (error) {
-        console.error('Link WhatsApp error:', error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -121,9 +75,9 @@ exports.linkTelegram = async (req, res) => {
 
 exports.unlinkAccount = async (req, res) => {
     try {
-        const { platform } = req.params; // whatsapp or telegram
+        const { platform } = req.params; // telegram
 
-        if (!['whatsapp', 'telegram'].includes(platform)) {
+        if (!['telegram'].includes(platform)) {
             return res.status(400).json({ error: 'Invalid platform' });
         }
 

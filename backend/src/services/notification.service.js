@@ -1,5 +1,4 @@
 const supabase = require('../config/supabase');
-const WhatsAppService = require('./whatsapp.service');
 const TelegramService = require('./telegram.service');
 
 class NotificationService {
@@ -152,13 +151,8 @@ class NotificationService {
 
             if (error || !user || !user.linked_accounts) return;
 
-            const { whatsapp, telegram } = user.linked_accounts;
+            const { telegram } = user.linked_accounts;
             const fullMessage = `*${title}*\n${message}`;
-
-            // Send to WhatsApp
-            if (whatsapp && whatsapp.verified && whatsapp.number) {
-                await WhatsAppService.send(whatsapp.number, fullMessage);
-            }
 
             // Send to Telegram
             if (telegram && telegram.chat_id) {

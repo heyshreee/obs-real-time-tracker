@@ -8,7 +8,6 @@ router.get('/usage', auth, userController.getUsageStats);
 
 // Linked Accounts Routes
 router.get('/linked-accounts', auth, linkedAccountsController.getLinkedAccounts);
-router.post('/linked-accounts/whatsapp', auth, linkedAccountsController.linkWhatsApp);
 router.post('/linked-accounts/telegram', auth, linkedAccountsController.linkTelegram);
 router.delete('/linked-accounts/:platform', auth, linkedAccountsController.unlinkAccount);
 
