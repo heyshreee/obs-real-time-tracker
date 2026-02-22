@@ -148,6 +148,18 @@ exports.login = async (req, res) => {
                 next_billing_date: user.next_billing_date
             }
         });
+
+        // Security Alert Notification
+        // We do this AFTER sending the response to not block the user login
+        const NotificationService = require('../services/notification.service');
+        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        NotificationService.create(
+            user.id,
+            'New Login Detected',
+            `A new login was detected on your account from IP ${req.ip}. If this wasn't you, please secure your account immediately.`,
+            'security'
+        ).catch(err => console.error('Failed to send login notification:', err));
+
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
@@ -352,6 +364,16 @@ exports.resetPassword = async (req, res) => {
         EmailService.sendPasswordChangedEmail(decoded.email || 'User', date, time, 'User').catch(console.error);
 
         res.json({ success: true, message: 'Password reset successfully' });
+
+        // Security Alert: Password Changed
+        const NotificationService = require('../services/notification.service');
+        NotificationService.create(
+            userId,
+            'Password Changed',
+            'Your password was successfully changed. If you did not make this change, please contact support immediately.',
+            'security'
+        ).catch(err => console.error('Failed to send password change notification:', err));
+
     } catch (error) {
         console.error('Reset password error:', error);
         res.status(500).json({ error: 'Failed to reset password' });

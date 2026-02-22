@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const TelegramService = require('./telegram.service');
 
 class NotificationService {
     /**
@@ -24,6 +25,11 @@ class NotificationService {
             if (global.io) {
                 global.io.to(`user_${userId}`).emit('new_notification', data);
             }
+
+            // Dispatch to linked accounts asynchronously
+            this.dispatchToLinkedAccounts(userId, title, message).catch(err =>
+                console.error('Error dispatching to linked accounts:', err)
+            );
 
             return data;
         } catch (error) {
@@ -128,6 +134,33 @@ class NotificationService {
         } catch (error) {
             console.error('Error cleaning up notifications:', error.message);
             return false;
+        }
+    }
+
+    /**
+     * Dispatch notification to linked external accounts
+     */
+    static async dispatchToLinkedAccounts(userId, title, message) {
+        try {
+            // Fetch user's linked accounts
+            const { data: user, error } = await supabase
+                .from('users')
+                .select('linked_accounts')
+                .eq('id', userId)
+                .single();
+
+            if (error || !user || !user.linked_accounts) return;
+
+            const { telegram } = user.linked_accounts;
+            const fullMessage = `*${title}*\n${message}`;
+
+            // Send to Telegram
+            if (telegram && telegram.chat_id) {
+                await TelegramService.send(telegram.chat_id, fullMessage);
+            }
+
+        } catch (error) {
+            console.error('Error in dispatchToLinkedAccounts:', error.message);
         }
     }
 }
